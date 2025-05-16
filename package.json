@@ -1,0 +1,17 @@
+{
+    "name": "betting-bot",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Automated betting bot for Adibet and Betpawa",
+    "main": "adibet-scraper.js",
+    "scripts": {
+        "scrape": "node adibet-scraper.js",
+        "bet": "node betpawa-bot.js"
+    },
+    "dependencies": {
+        "axios": "^1.6.7",
+        "cheerio": "^1.0.0-rc.12",
+        "dotenv": "^16.4.5",
+        "playwright": "^1.52.0"
+    }
+}

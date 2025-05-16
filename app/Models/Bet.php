@@ -9,19 +9,18 @@ class Bet extends Model
 {
     protected $fillable = [
         'prediction_id',
-        'betpawa_id',
-        'amount',
-        'status',
-        'potential_winnings',
-        'placed_at',
-        'raw_data'
+        'stake',
+        'odds',
+        'outcome',
+        'win_loss',
+        'placed_at'
     ];
 
     protected $casts = [
-        'amount' => 'float',
-        'potential_winnings' => 'float',
-        'placed_at' => 'datetime',
-        'raw_data' => 'array'
+        'stake' => 'decimal:2',
+        'odds' => 'decimal:2',
+        'win_loss' => 'decimal:2',
+        'placed_at' => 'datetime'
     ];
 
     /**
@@ -33,34 +32,26 @@ class Bet extends Model
     }
 
     /**
+     * Scope a query to only include winning bets.
+     */
+    public function scopeWinning($query)
+    {
+        return $query->where('outcome', 'W');
+    }
+
+    /**
+     * Scope a query to only include losing bets.
+     */
+    public function scopeLosing($query)
+    {
+        return $query->where('outcome', 'L');
+    }
+
+    /**
      * Scope a query to only include pending bets.
      */
     public function scopePending($query)
     {
-        return $query->where('status', 'pending');
-    }
-
-    /**
-     * Scope a query to only include placed bets.
-     */
-    public function scopePlaced($query)
-    {
-        return $query->where('status', 'placed');
-    }
-
-    /**
-     * Scope a query to only include won bets.
-     */
-    public function scopeWon($query)
-    {
-        return $query->where('status', 'won');
-    }
-
-    /**
-     * Scope a query to only include lost bets.
-     */
-    public function scopeLost($query)
-    {
-        return $query->where('status', 'lost');
+        return $query->where('outcome', 'P');
     }
 }

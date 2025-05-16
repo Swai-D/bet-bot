@@ -4,69 +4,159 @@ namespace App\Services;
 
 use App\Models\Bet;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client;
+use GuzzleHttp\Cookie\CookieJar;
 
 class BetpawaAutomation
 {
-    protected $betpawaBot;
+    protected $baseUrl = 'https://api.betpawa.co.tz/api/v1';
+    protected $session;
+    protected $cookies = [];
+    protected $isLoggedIn = false;
 
     public function __construct()
     {
-        $this->betpawaBot = new BetpawaBot();
+        $this->session = Http::withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ])->withOptions([
+            'verify' => false, // Disable SSL verification for testing
+        ]);
     }
 
-    public function placeBets(array $tips, int $stake)
+    public function login($username = null, $password = null)
     {
         try {
-            $result = $this->betpawaBot->placeBet($tips, $stake);
+            // Use credentials from parameters or .env file
+            $username = $username ?? env('BETPAWA_USERNAME');
+            $password = $password ?? env('BETPAWA_PASSWORD');
 
-            if ($result['success']) {
-                $this->saveBet($tips, $result);
-                return true;
+            if (!$username || !$password) {
+                Log::error('Betpawa credentials not found');
+                return false;
             }
 
+            // Attempt login
+            $loginResponse = $this->session->post($this->baseUrl . '/auth/login', [
+                'phoneNumber' => $username,
+                'password' => $password,
+            ]);
+
+            if ($loginResponse->successful()) {
+                $data = $loginResponse->json();
+                if ($data['success']) {
+                    // Store token
+                    $this->session = $this->session->withToken($data['token']);
+                return true;
+                }
+            }
+
+            Log::error('Login failed: ' . $loginResponse->body());
             return false;
 
         } catch (\Exception $e) {
-            Log::error('Error placing bets: ' . $e->getMessage());
+            Log::error('Login error: ' . $e->getMessage());
             return false;
         }
     }
 
-    protected function saveBet(array $tips, array $result)
-    {
-        $bet = new Bet();
-        $bet->predictions = json_encode($tips);
-        $bet->confirmation = $result['confirmation'] ?? null;
-        $bet->status = 'pending';
-        $bet->save();
-    }
-
-    public function checkBetStatus(Bet $bet)
+    public function searchMatch($matchName)
     {
         try {
-            $result = $this->betpawaBot->checkBetStatus($bet->id);
-
-            if ($result['success']) {
-                $bet->status = $result['status'];
-                $bet->save();
-                return true;
+            if (!$this->isLoggedIn) {
+                throw new \Exception('Not logged in to Betpawa');
             }
 
-            return false;
+            Log::info("Searching for match: {$matchName}");
+            
+            $response = $this->session->get($this->baseUrl . '/search', [
+                'query' => [
+                    'q' => $matchName
+                ]
+            ]);
+
+            $data = json_decode($response->body(), true);
+            
+            if (!$data['success']) {
+                Log::error('Search failed: ' . $data['message']);
+                return [];
+            }
+
+            $matches = array_map(function($match) {
+                return [
+                    'id' => $match['id'],
+                    'type' => $match['type'],
+                    'odds' => $match['odds']
+                ];
+            }, $data['matches']);
+
+            Log::info('Found ' . count($matches) . ' matches');
+            return $matches;
 
         } catch (\Exception $e) {
-            Log::error('Error checking bet status: ' . $e->getMessage());
-            return false;
+            Log::error('Error searching match: ' . $e->getMessage());
+            return [];
         }
     }
 
-    public function getAccountBalance()
+    public function placeBet($matchId, $oddType, $amount)
     {
         try {
-            return $this->betpawaBot->getAccountBalance();
+            $response = $this->session->post($this->baseUrl . '/bets/place', [
+                'matchId' => $matchId,
+                'oddType' => $oddType,
+                'amount' => $amount
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return [
+                    'success' => true,
+                    'bet_id' => $data['bet_id'] ?? null,
+                    'message' => 'Bet placed successfully'
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Failed to place bet'
+            ];
+
         } catch (\Exception $e) {
-            Log::error('Error getting account balance: ' . $e->getMessage());
-            return 0;
+            Log::error('Place bet error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    public function getBalance()
+    {
+        try {
+            $response = $this->session->get($this->baseUrl . '/account/balance');
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return [
+                    'success' => true,
+                    'balance' => $data['balance'] ?? 0
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Failed to get balance'
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Get balance error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
         }
     }
 } 

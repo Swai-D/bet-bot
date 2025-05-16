@@ -9,18 +9,19 @@ class Prediction extends Model
 {
     protected $fillable = [
         'match_id',
-        'date',
+        'match',
         'country',
-        'team_home',
-        'team_away',
+        'date',
         'tips',
-        'raw_data'
+        'raw_data',
+        'selected'
     ];
 
     protected $casts = [
         'date' => 'date',
         'tips' => 'array',
-        'raw_data' => 'array'
+        'raw_data' => 'array',
+        'selected' => 'boolean'
     ];
 
     /**
@@ -45,6 +46,14 @@ class Prediction extends Model
     public function scopeForCountry($query, $country)
     {
         return $query->where('country', $country);
+    }
+
+    /**
+     * Scope a query to only include selected predictions.
+     */
+    public function scopeSelected($query)
+    {
+        return $query->where('selected', true);
     }
 
     /**

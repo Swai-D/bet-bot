@@ -14,13 +14,16 @@ return new class extends Migration
         Schema::create('bets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('prediction_id')->constrained()->onDelete('cascade');
-            $table->string('betpawa_id')->unique();
-            $table->float('amount');
-            $table->string('status')->default('pending'); // pending, placed, won, lost
-            $table->float('potential_winnings');
-            $table->timestamp('placed_at')->nullable();
-            $table->json('raw_data')->nullable(); // Store complete bet data
+            $table->decimal('stake', 10, 2);
+            $table->decimal('odds', 5, 2);
+            $table->enum('outcome', ['W', 'L', 'P'])->default('P'); // W = Win, L = Loss, P = Pending
+            $table->decimal('win_loss', 10, 2)->default(0);
+            $table->timestamp('placed_at');
             $table->timestamps();
+
+            // Add indexes for better query performance
+            $table->index('outcome');
+            $table->index('placed_at');
         });
     }
 
@@ -31,4 +34,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('bets');
     }
-};
+}; 

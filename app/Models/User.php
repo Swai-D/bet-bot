@@ -38,11 +38,79 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
+
+    /**
+     * Get the user's settings.
+     */
+    public function settings()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->hasOne(Setting::class);
+    }
+
+    /**
+     * Get the user's predictions.
+     */
+    public function predictions()
+    {
+        return $this->hasMany(Prediction::class);
+    }
+
+    /**
+     * Get the user's bets.
+     */
+    public function bets()
+    {
+        return $this->hasMany(Bet::class);
+    }
+
+    /**
+     * Get the user's default settings.
+     */
+    public function getDefaultSettings(): array
+    {
+        return Setting::getDefaults();
+    }
+
+    /**
+     * Get the user's settings or create default ones.
+     */
+    public function getSettings(): Setting
+    {
+        return $this->settings ?? new Setting($this->getDefaultSettings());
+    }
+
+    /**
+     * Update the user's settings.
+     */
+    public function updateSettings(array $settings): Setting
+    {
+        $settings = $this->settings ?? new Setting();
+        $settings->fill($settings);
+        $settings->user_id = $this->id;
+        $settings->save();
+        return $settings;
+    }
+
+    /**
+     * Reset the user's settings to defaults.
+     */
+    public function resetSettings(): Setting
+    {
+        if ($this->settings) {
+            $this->settings->delete();
+        }
+        return $this->getSettings();
+    }
+
+    /**
+     * Check if the user has settings.
+     */
+    public function hasSettings(): bool
+    {
+        return $this->settings !== null;
     }
 }

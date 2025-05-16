@@ -2,59 +2,61 @@
 
 namespace App\Console\Commands;
 
-use App\Services\BettingService;
+use App\Services\BetService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
 class RunBettingBot extends Command
 {
-    protected $signature = 'betting:run {--stake=1000 : The stake amount to bet}';
-    protected $description = 'Run the betting bot to scrape matches and place bets';
+    protected $signature = 'betting:run';
+    protected $description = 'Run the betting bot';
 
-    protected $bettingService;
+    protected $betService;
 
-    public function __construct(BettingService $bettingService)
+    public function __construct(BetService $betService)
     {
         parent::__construct();
-        $this->bettingService = $bettingService;
+        $this->betService = $betService;
     }
 
     public function handle()
     {
+        $this->info('Starting betting bot...');
+
         try {
-            $this->info('Starting betting process...');
+            // Get pending bets
+            $pendingBets = $this->betService->getPendingBets();
 
-            // Step 1: Scrape matches
-            $this->info('Scraping matches from Adibet...');
-            $matches = $this->bettingService->scrapeMatches();
-            $this->info('Successfully scraped matches');
+            foreach ($pendingBets as $bet) {
+                $this->info("Checking status for bet: {$bet->match_name}");
+                
+                $result = $this->betService->checkBetStatus($bet);
+                
+                if ($result['success']) {
+                    if ($bet->isWon()) {
+                        $this->info("Bet won! Amount: {$bet->actual_win}");
+                    } else {
+                        $this->info("Bet lost!");
+                    }
+                } else {
+                    $this->error("Error checking bet status: {$result['message']}");
+                }
+            }
 
-            // Step 2: Select matches
-            $this->info('Selecting matches with odds ≥ 3.00...');
-            $betData = $this->bettingService->selectMatches($matches);
-            $this->info('Selected ' . count($betData['tips']) . ' matches');
+            // Show statistics
+            $this->showStatistics();
 
-            // Step 3: Place bet
-            $this->info('Placing bet on Betpawa...');
-            $result = $this->bettingService->placeBet($betData);
-            
-            $this->info('Bet placed successfully!');
-            $this->table(
-                ['Match', 'Option', 'Odd'],
-                collect($betData['tips'])->map(function ($tip) {
-                    return [
-                        'match' => $tip['match'],
-                        'option' => $tip['option'],
-                        'odd' => $tip['odd']
-                    ];
-                })
-            );
-
-            return Command::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
-            Log::error('Betting bot failed: ' . $e->getMessage());
-            return Command::FAILURE;
+            Log::error('Error running betting bot: ' . $e->getMessage());
+            $this->error('Error running betting bot: ' . $e->getMessage());
         }
+    }
+
+    protected function showStatistics()
+    {
+        $this->info("\nBetting Statistics:");
+        $this->info("Total Winnings: " . $this->betService->getTotalWinnings());
+        $this->info("Total Losses: " . $this->betService->getTotalLosses());
+        $this->info("Profit: " . $this->betService->getProfit());
     }
 } 

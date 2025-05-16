@@ -56,21 +56,34 @@ class AdibetScraper
     {
         $this->client = new Client([
             'headers' => [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            ]
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language' => 'en-US,en;q=0.5',
+                'Connection' => 'keep-alive',
+                'Upgrade-Insecure-Requests' => '1'
+            ],
+            'timeout' => 30,
+            'verify' => false // Disable SSL verification for development
         ]);
     }
 
     public function fetchPredictions()
     {
         try {
+            Log::info('Starting to fetch predictions from Adibet');
+
             $response = $this->client->get($this->baseUrl);
             $html = $response->getBody()->getContents();
             
+            if (empty($html)) {
+                throw new \Exception('Received empty response from Adibet');
+            }
+
+            Log::info('Successfully fetched HTML from Adibet');
             return $this->parsePredictions($html);
         } catch (\Exception $e) {
             Log::error('Error fetching predictions: ' . $e->getMessage());
-            return [];
+            throw $e;
         }
     }
 
@@ -91,52 +104,50 @@ class AdibetScraper
         });
 
         // Then process each table
-        $crawler->filter('table')->each(function (Crawler $table) use (&$predictions, &$currentDate, &$isTodaySection, &$processedMatches, $today) {
-            // Check if this table has a date header
-            $dateNode = $table->filter('font[color="#C0C0C0"]')->first();
-            if ($dateNode->count() > 0) {
-                $currentDate = trim($dateNode->text());
-                $isTodaySection = ($currentDate === $today);
-                return;
-            }
-
-            // Only process matches if we're in today's section
-            if (!$isTodaySection) {
+        $crawler->filter('table')->each(function (Crawler $table) use (&$predictions, &$currentDate, &$processedMatches) {
+            // Check if this is a date header table
+            $dateHeader = $table->filter('font[color="#C0C0C0"]');
+            if ($dateHeader->count() > 0) {
+                $rawDate = trim($dateHeader->text());
+                $dateMatch = preg_match('/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/', $rawDate, $matches);
+                
+                if ($dateMatch) {
+                    $currentDate = Carbon::createFromFormat('d - m - Y', $matches[0])->format('Y-m-d');
+                    Log::info("Processing matches for date: {$currentDate}");
+                }
                 return;
             }
 
             // Process match rows
-            $table->filter('tr')->each(function (Crawler $row) use (&$predictions, &$processedMatches) {
+            $table->filter('tr')->each(function (Crawler $row) use (&$predictions, $currentDate, &$processedMatches) {
+                if ($row->filter('th')->count() > 0) {
+                    return; // Skip header rows
+                }
+
                 try {
-                    // Skip header rows
-                    if ($row->filter('th')->count() > 0) {
-                        return;
-                    }
+                    // Get country from image alt
+                    $country = $row->filter('img')->attr('alt') ?? 'Unknown';
 
                     // Get teams from yellow text
-                    $teamsText = $row->filter('font[color="#D5B438"]')->first()->text();
-                    if (empty($teamsText)) {
-                        return;
+                    $teamsText = $row->filter('font[color="#D5B438"]')->text();
+                    $teams = explode(' - ', $teamsText);
+                    
+                    if (count($teams) !== 2) {
+                        return; // Skip invalid team format
                     }
 
-                    // Split teams
-                    [$team_home, $team_away] = array_map('trim', explode('-', $teamsText));
+                    $teamHome = trim($teams[0]);
+                    $teamAway = trim($teams[1]);
+                    $matchId = Str::slug("{$teamHome}-vs-{$teamAway}-{$currentDate}");
 
-                    // Create unique match ID
-                    $matchId = md5(strtolower("{$team_home}-{$team_away}"));
-                    
                     // Skip if we've already processed this match
                     if (in_array($matchId, $processedMatches)) {
                         return;
                     }
-                    
-                    // Add to processed matches
+
                     $processedMatches[] = $matchId;
 
-                    // Get country from image alt
-                    $country = $row->filter('img')->attr('alt') ?? 'Unknown';
-
-                    // Get all tips (cells with bgcolor="#272727")
+                    // Get tips
                     $tips = [];
                     $row->filter('td[bgcolor="#272727"]')->each(function (Crawler $cell) use (&$tips) {
                         $tip = $cell->filter('font[color="#D5B438"]')->text();
@@ -154,9 +165,9 @@ class AdibetScraper
                     
                     $predictions[] = [
                         'match_id' => $matchId,
-                        'match' => "{$team_home} vs {$team_away}",
+                        'match' => "{$teamHome} vs {$teamAway}",
                         'country' => $country,
-                        'date' => Carbon::now()->format('Y-m-d'),
+                        'date' => $currentDate,
                         'tips' => $tips,
                         'raw_data' => json_encode([
                             'html' => $row->outerHtml(),
@@ -169,16 +180,21 @@ class AdibetScraper
             });
         });
 
+        Log::info('Successfully parsed ' . count($predictions) . ' predictions');
         return $predictions;
     }
 
     public function savePredictions($predictions)
     {
         foreach ($predictions as $prediction) {
+            try {
             Prediction::updateOrCreate(
                 ['match_id' => $prediction['match_id']],
                 $prediction
             );
+            } catch (\Exception $e) {
+                Log::error('Error saving prediction: ' . $e->getMessage());
+            }
         }
     }
 

@@ -104,7 +104,7 @@ class AdibetScraper {
                 if (dateMatch) {
                     const [_, day, month, year] = dateMatch;
                     currentDate = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
-                    console.log(`Found date header: ${currentDate}`);
+                console.log(`Found date header: ${currentDate}`);
                 } else {
                     console.log('Could not parse date:', rawDate);
                 }
@@ -119,7 +119,7 @@ class AdibetScraper {
                 if (!predictions[currentDate]) {
                     predictions[currentDate] = [];
                 }
-
+                
                 // Process each match row
                 $table.find('tr').each((_, row) => {
                     const $row = $(row);
@@ -191,10 +191,10 @@ class AdibetScraper {
 // Main function to run the scraper
 async function main() {
     try {
-        const scraper = new AdibetScraper();
-        const result = await scraper.getPredictions();
-        
-        if (result.success) {
+    const scraper = new AdibetScraper();
+    const result = await scraper.getPredictions();
+    
+    if (result.success) {
             // Format the data as expected by the PHP code
             const formattedData = {};
             Object.entries(result.data).forEach(([date, matches]) => {
@@ -210,8 +210,8 @@ async function main() {
             const jsonOutput = JSON.stringify(formattedData, null, 2);
             console.log(jsonOutput);
             process.exit(0);
-        } else {
-            console.error('Failed to scrape predictions:', result.error);
+    } else {
+        console.error('Failed to scrape predictions:', result.error);
             process.exit(1);
         }
     } catch (error) {

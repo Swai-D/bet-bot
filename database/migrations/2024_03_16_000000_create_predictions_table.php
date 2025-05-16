@@ -14,16 +14,18 @@ return new class extends Migration
         Schema::create('predictions', function (Blueprint $table) {
             $table->id();
             $table->string('match_id')->unique();
-            $table->date('date');
+            $table->string('match');
             $table->string('country');
-            $table->string('team_home');
-            $table->string('team_away');
+            $table->date('date');
             $table->json('tips');
             $table->json('raw_data')->nullable();
+            $table->boolean('selected')->default(false);
             $table->timestamps();
 
-            // Add index for date to improve query performance
+            // Add indexes for better query performance
             $table->index('date');
+            $table->index('country');
+            $table->index('selected');
         });
     }
 
@@ -34,4 +36,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('predictions');
     }
-};
+}; 

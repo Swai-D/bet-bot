@@ -35,14 +35,14 @@ function handleImageError() {
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
                     <span class="text-2xl font-bold text-blue-500">BetBot</span>
-                </div>
+                    </div>
                 <div class="flex items-center space-x-4">
-                    <Link
-                        :href="route('login')"
+                            <Link
+                                :href="route('login')"
                         class="rounded-md px-4 py-2 text-sm font-semibold text-white hover:text-blue-400 transition-colors"
-                    >
-                        Log in
-                    </Link>
+                            >
+                                Log in
+                            </Link>
                     <Link
                         :href="route('register')"
                         class="rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 transition-colors"
@@ -64,22 +64,22 @@ function handleImageError() {
                     Let our advanced betting bot analyze matches, place bets, and maximize your winning potential with data-driven predictions.
                 </p>
                 <div class="flex space-x-4">
-                    <Link
-                        v-if="canRegister"
-                        :href="route('register')"
+                            <Link
+                                v-if="canRegister"
+                                :href="route('register')"
                         class="rounded-md bg-blue-500 px-8 py-3 text-lg font-semibold text-white hover:bg-blue-600 transition-colors"
-                    >
+                            >
                         Get Started
-                    </Link>
+                            </Link>
                     <a
                         href="#features"
                         class="rounded-md border border-blue-500 px-8 py-3 text-lg font-semibold text-white hover:bg-blue-500/10 transition-colors"
                     >
                         Learn More
                     </a>
-                </div>
-            </div>
-        </div>
+                                    </div>
+                                    </div>
+                                </div>
 
         <!-- Features Section -->
         <div id="features" class="container mx-auto px-6 py-16">
@@ -99,9 +99,9 @@ function handleImageError() {
                     <div class="text-blue-500 text-4xl mb-4">💰</div>
                     <h3 class="text-xl font-semibold mb-2">Profit Tracking</h3>
                     <p class="text-gray-300">Monitor your betting performance with detailed statistics and reports.</p>
-                </div>
-            </div>
-        </div>
+                            </div>
+                            </div>
+                            </div>
 
         <!-- How It Works Section -->
         <div class="container mx-auto px-6 py-16">
@@ -111,24 +111,24 @@ function handleImageError() {
                     <div class="text-blue-500 text-4xl mb-4">1</div>
                     <h3 class="text-xl font-semibold mb-2">Sign Up</h3>
                     <p class="text-gray-300">Create your account and set your preferences</p>
-                </div>
+                            </div>
                 <div class="text-center">
                     <div class="text-blue-500 text-4xl mb-4">2</div>
                     <h3 class="text-xl font-semibold mb-2">Configure</h3>
                     <p class="text-gray-300">Set your betting strategy and limits</p>
-                </div>
+                            </div>
                 <div class="text-center">
                     <div class="text-blue-500 text-4xl mb-4">3</div>
                     <h3 class="text-xl font-semibold mb-2">Monitor</h3>
                     <p class="text-gray-300">Watch the bot analyze and place bets</p>
-                </div>
+                            </div>
                 <div class="text-center">
                     <div class="text-blue-500 text-4xl mb-4">4</div>
                     <h3 class="text-xl font-semibold mb-2">Profit</h3>
                     <p class="text-gray-300">Track your winnings and adjust strategy</p>
-                </div>
-            </div>
-        </div>
+                            </div>
+                        </div>
+                    </div>
 
         <!-- CTA Section -->
         <div class="container mx-auto px-6 py-16">

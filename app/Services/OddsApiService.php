@@ -4,26 +4,80 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class OddsApiService
 {
     protected $apiKey;
     protected $baseUrl = 'https://api.the-odds-api.com/v4';
     
-    // Map our leagues to API leagues
+    // Map our leagues to API leagues with proper team mappings
     protected $leagueMap = [
-        'austria_2' => 'soccer_austria_bundesliga',
-        'belgium' => 'soccer_belgium_first_div',
-        'china' => 'soccer_china_superleague',
-        'denmark' => 'soccer_denmark_superliga',
-        'england' => 'soccer_epl',
-        'germany' => 'soccer_germany_bundesliga',
-        'spain' => 'soccer_spain_la_liga',
-        'italy' => 'soccer_italy_serie_a',
-        'france' => 'soccer_france_ligue_1',
-        'netherlands' => 'soccer_netherlands_eredivisie',
-        'portugal' => 'soccer_portugal_primeira_liga',
-        'turkey' => 'soccer_turkey_super_league',
+        'austria_2' => [
+            'api_league' => 'soccer_austria_bundesliga',
+            'teams' => [
+                'st. polten' => ['SKN St. Polten', 'St. Polten', 'St. Pölten'],
+                'rapid' => ['SK Rapid II', 'Rapid Wien II', 'Rapid Vienna II', 'Rapid II'],
+                'rapid ii' => ['SK Rapid II', 'Rapid Wien II', 'Rapid Vienna II', 'Rapid II'],
+                'rapid wien ii' => ['SK Rapid II', 'Rapid Wien II', 'Rapid Vienna II', 'Rapid II'],
+                'rapid vienna ii' => ['SK Rapid II', 'Rapid Wien II', 'Rapid Vienna II', 'Rapid II'],
+                'bregenz' => ['SC Bregenz', 'Bregenz'],
+                'ried' => ['SV Ried', 'Ried'],
+            ]
+        ],
+        'belgium' => [
+            'api_league' => 'soccer_belgium_first_div',
+            'teams' => [
+                'leuven' => ['OH Leuven', 'Leuven'],
+                'westerlo' => ['Westerlo', 'KVC Westerlo'],
+            ]
+        ],
+        'china' => [
+            'api_league' => 'soccer_china_superleague',
+            'teams' => [
+                'yunnan yukun' => ['Yunnan Yukun', 'Yunnan'],
+                'meizhou hakka' => ['Meizhou Hakka', 'Meizhou'],
+            ]
+        ],
+        'denmark' => [
+            'api_league' => 'soccer_denmark_superliga',
+            'teams' => [
+                'norsjaelland' => ['FC Nordsjælland', 'Nordsjælland', 'Norsjaelland'],
+                'aarhus' => ['Aarhus GF', 'Aarhus', 'AGF'],
+            ]
+        ],
+        'england' => [
+            'api_league' => 'soccer_epl',
+            'teams' => []
+        ],
+        'germany' => [
+            'api_league' => 'soccer_germany_bundesliga',
+            'teams' => []
+        ],
+        'spain' => [
+            'api_league' => 'soccer_spain_la_liga',
+            'teams' => []
+        ],
+        'italy' => [
+            'api_league' => 'soccer_italy_serie_a',
+            'teams' => []
+        ],
+        'france' => [
+            'api_league' => 'soccer_france_ligue_1',
+            'teams' => []
+        ],
+        'netherlands' => [
+            'api_league' => 'soccer_netherlands_eredivisie',
+            'teams' => []
+        ],
+        'portugal' => [
+            'api_league' => 'soccer_portugal_primeira_liga',
+            'teams' => []
+        ],
+        'turkey' => [
+            'api_league' => 'soccer_turkey_super_league',
+            'teams' => []
+        ],
     ];
 
     public function __construct()
@@ -41,16 +95,24 @@ class OddsApiService
     {
         try {
             // Map the league to API format
-            $apiLeague = $this->mapLeague($league);
+            $leagueConfig = $this->mapLeague($league);
+            if (!$leagueConfig) {
+                Log::error('Invalid league mapping', ['league' => $league]);
+                return null;
+            }
+
+            $apiLeague = $leagueConfig['api_league'];
             
             // Log the request details
             Log::info('Fetching odds from API', [
                 'match' => $match,
                 'date' => $date,
                 'league' => $league,
-                'api_league' => $apiLeague,
-                'api_key' => substr($this->apiKey, 0, 5) . '...' // Log partial key for debugging
+                'api_league' => $apiLeague
             ]);
+
+            // Add delay to respect rate limits
+            sleep(1);
 
             $response = Http::get("{$this->baseUrl}/sports/{$apiLeague}/odds", [
                 'apiKey' => $this->apiKey,
@@ -81,34 +143,37 @@ class OddsApiService
 
             $matches = $response->json();
             
-            // Validate API response
-            if (!is_array($matches)) {
-                Log::error('Invalid API Response', [
-                    'response' => $matches,
-                    'match' => $match,
-                    'date' => $date,
-                    'league' => $apiLeague
-                ]);
-                return null;
-            }
-
-            // Log the API response
-            Log::info('API Response', [
-                'match_count' => count($matches),
-                'first_match' => $matches[0] ?? null,
-                'league' => $apiLeague
+            // Log raw API response for debugging
+            Log::info('Raw API Response', [
+                'response_type' => gettype($matches),
+                'is_array' => is_array($matches),
+                'count' => is_array($matches) ? count($matches) : 0,
+                'first_match' => is_array($matches) && !empty($matches) ? $matches[0] : null
             ]);
-
-            if (empty($matches)) {
+            
+            if (!is_array($matches) || empty($matches)) {
                 Log::warning('No matches found in API response', [
                     'league' => $apiLeague,
                     'match' => $match,
-                    'date' => $date
+                    'date' => $date,
+                    'response' => $matches
                 ]);
                 return null;
             }
 
-            return $this->findMatchingOdds($matches, $match, $date);
+            // Log available matches for debugging
+            Log::info('Available matches', [
+                'count' => count($matches),
+                'matches' => array_map(function($m) {
+                    return [
+                        'teams' => $m['home_team'] . ' vs ' . $m['away_team'],
+                        'date' => $m['commence_time'],
+                        'bookmakers' => count($m['bookmakers'] ?? [])
+                    ];
+                }, $matches)
+            ]);
+
+            return $this->findMatchingOdds($matches, $match, $date, $leagueConfig['teams']);
 
         } catch (\Exception $e) {
             Log::error('Odds API Exception', [
@@ -125,28 +190,28 @@ class OddsApiService
     /**
      * Map our league format to API league format
      */
-    protected function mapLeague(string $league): string
+    protected function mapLeague(string $league): ?array
     {
-        $apiLeague = $this->leagueMap[$league] ?? 'soccer_epl';
-        Log::info('League mapping', [
-            'input_league' => $league,
-            'api_league' => $apiLeague
-        ]);
-        return $apiLeague;
+        if (!isset($this->leagueMap[$league])) {
+            Log::warning('Unknown league', ['league' => $league]);
+            return null;
+        }
+        return $this->leagueMap[$league];
     }
 
     /**
      * Find matching odds for a prediction
      */
-    protected function findMatchingOdds(array $matches, string $predictionMatch, string $predictionDate)
+    protected function findMatchingOdds(array $matches, string $predictionMatch, string $predictionDate, array $teamMappings)
     {
         foreach ($matches as $match) {
-            if ($this->isMatch($match, $predictionMatch, $predictionDate)) {
+            if ($this->isMatch($match, $predictionMatch, $predictionDate, $teamMappings)) {
                 $odds = $this->formatOdds($match);
                 Log::info('Found matching odds', [
                     'prediction_match' => $predictionMatch,
                     'api_match' => $match['home_team'] . ' vs ' . $match['away_team'],
-                    'odds' => $odds
+                    'odds' => $odds,
+                    'bookmakers' => count($match['bookmakers'] ?? [])
                 ]);
                 return $odds;
             }
@@ -158,7 +223,8 @@ class OddsApiService
             'available_matches' => array_map(function($match) {
                 return [
                     'teams' => $match['home_team'] . ' vs ' . $match['away_team'],
-                    'date' => $match['commence_time']
+                    'date' => $match['commence_time'],
+                    'bookmakers' => count($match['bookmakers'] ?? [])
                 ];
             }, $matches)
         ]);
@@ -169,27 +235,21 @@ class OddsApiService
     /**
      * Check if API match matches our prediction
      */
-    protected function isMatch(array $apiMatch, string $predictionMatch, string $predictionDate): bool
+    protected function isMatch(array $apiMatch, string $predictionMatch, string $predictionDate, array $teamMappings): bool
     {
         // Normalize team names for comparison
         $predictionTeams = $this->normalizeTeamNames($predictionMatch);
         $apiHomeTeam = $this->normalizeTeamName($apiMatch['home_team']);
         $apiAwayTeam = $this->normalizeTeamName($apiMatch['away_team']);
 
-        // Log the comparison
-        Log::info('Comparing teams', [
-            'prediction' => $predictionTeams,
-            'api' => [
-                'home' => $apiHomeTeam,
-                'away' => $apiAwayTeam
-            ]
-        ]);
+        // Check team mappings
+        $homeTeamMatches = $this->checkTeamMapping($predictionTeams['home'], $apiHomeTeam, $teamMappings);
+        $awayTeamMatches = $this->checkTeamMapping($predictionTeams['away'], $apiAwayTeam, $teamMappings);
 
         // Check if teams match (in any order)
-        $teamsMatch = (
-            ($predictionTeams['home'] === $apiHomeTeam && $predictionTeams['away'] === $apiAwayTeam) ||
-            ($predictionTeams['home'] === $apiAwayTeam && $predictionTeams['away'] === $apiHomeTeam)
-        );
+        $teamsMatch = ($homeTeamMatches && $awayTeamMatches) || 
+                     ($this->checkTeamMapping($predictionTeams['home'], $apiAwayTeam, $teamMappings) && 
+                      $this->checkTeamMapping($predictionTeams['away'], $apiHomeTeam, $teamMappings));
 
         // Check if dates match (within 24 hours)
         $predictionDateTime = new \DateTime($predictionDate);
@@ -203,10 +263,59 @@ class OddsApiService
             'dates_match' => $datesMatch,
             'date_diff_hours' => $dateDiff / 3600,
             'prediction_date' => $predictionDate,
-            'api_date' => $apiMatch['commence_time']
+            'api_date' => $apiMatch['commence_time'],
+            'prediction_teams' => $predictionTeams,
+            'api_teams' => [
+                'home' => $apiHomeTeam,
+                'away' => $apiAwayTeam
+            ],
+            'team_mappings' => [
+                'home_match' => $homeTeamMatches,
+                'away_match' => $awayTeamMatches
+            ]
         ]);
 
         return $teamsMatch && $datesMatch;
+    }
+
+    /**
+     * Check if a team matches using mappings
+     */
+    protected function checkTeamMapping(string $predictionTeam, string $apiTeam, array $teamMappings): bool
+    {
+        // Direct match
+        if ($predictionTeam === $apiTeam) {
+            return true;
+        }
+
+        // Check mappings
+        foreach ($teamMappings as $key => $variations) {
+            if ($predictionTeam === $key) {
+                return in_array($apiTeam, $variations);
+            }
+        }
+
+        // Fuzzy match as fallback
+        return $this->fuzzyMatch($predictionTeam, $apiTeam);
+    }
+
+    /**
+     * Fuzzy match team names
+     */
+    protected function fuzzyMatch(string $team1, string $team2): bool
+    {
+        $team1 = $this->normalizeTeamName($team1);
+        $team2 = $this->normalizeTeamName($team2);
+        
+        // Remove common suffixes
+        $suffixes = ['fc', 'fk', 'sk', 'sc', 'sv', 'tsv', 'vfb', 'vfl', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+        foreach ($suffixes as $suffix) {
+            $team1 = str_replace($suffix, '', $team1);
+            $team2 = str_replace($suffix, '', $team2);
+        }
+        
+        // Compare normalized names
+        return trim($team1) === trim($team2);
     }
 
     /**
@@ -240,13 +349,6 @@ class OddsApiService
         if ($odds['1'] && $odds['2']) {
             $odds['X'] = round(1 / (1 - (1/$odds['1']) - (1/$odds['2'])), 2);
         }
-
-        // Log the formatted odds
-        Log::info('Formatted odds', [
-            'match' => $match['home_team'] . ' vs ' . $match['away_team'],
-            'odds' => $odds,
-            'bookmakers' => count($match['bookmakers'] ?? [])
-        ]);
 
         return $odds;
     }

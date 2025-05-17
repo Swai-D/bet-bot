@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Game;
+use App\Models\Prediction;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -23,36 +23,42 @@ class ShowPredictions extends Command
     {
         $this->showHeader();
 
-        $query = Game::query();
+        $query = Prediction::query();
 
         // Apply filters
         if ($this->option('best')) {
-            $query->where('odds', '>=', 2.5);
+            $query->whereHas('tips', function($q) {
+                $q->where('odd', '>=', 2.5);
+            });
             $this->info('🔝 Showing best predictions (odds >= 2.5)');
         }
 
         if ($this->option('moderate')) {
-            $query->whereBetween('odds', [1.5, 2.5]);
+            $query->whereHas('tips', function($q) {
+                $q->whereBetween('odd', [1.5, 2.5]);
+            });
             $this->info('⚖️ Showing moderate predictions (odds between 1.5 and 2.5)');
         }
 
         if ($date = $this->option('date')) {
-            $query->whereDate('match_date', Carbon::parse($date));
+            $query->whereDate('date', Carbon::parse($date));
             $this->info("📅 Showing predictions for date: {$date}");
         }
 
         if ($team = $this->option('team')) {
-            $query->where('teams', 'like', "%{$team}%");
+            $query->where('match', 'like', "%{$team}%");
             $this->info("🏟️ Filtering by team: {$team}");
         }
 
         if ($tip = $this->option('tip')) {
-            $query->where('tips', $tip);
+            $query->whereHas('tips', function($q) use ($tip) {
+                $q->where('option', $tip);
+            });
             $this->info("🎯 Filtering by tip: {$tip}");
         }
 
         // Get predictions
-        $predictions = $query->latest()->get();
+        $predictions = $query->with('tips')->latest()->get();
 
         if ($predictions->isEmpty()) {
             $this->showNoPredictions();
@@ -92,14 +98,13 @@ class ShowPredictions extends Command
         $this->info('📊 PREDICTIONS TABLE');
         $this->newLine();
 
-        $headers = ['Match', 'Date', 'Tip', 'Odds', 'Selected'];
+        $headers = ['Match', 'Date', 'Tips', 'Country'];
         $rows = $predictions->map(function ($prediction) {
             return [
-                'teams' => $this->formatTeams($prediction->teams),
-                'date' => $this->formatDate($prediction->match_date),
-                'tip' => $this->formatTip($prediction->tips),
-                'odds' => $this->formatOdds($prediction->odds),
-                'selected' => $this->formatSelected($prediction->selected)
+                'match' => $this->formatTeams($prediction->match),
+                'date' => $this->formatDate($prediction->date),
+                'tips' => $this->formatTips($prediction->tips),
+                'country' => $prediction->country
             ];
         });
 
@@ -120,12 +125,11 @@ class ShowPredictions extends Command
     protected function showPredictionDetails($prediction)
     {
         $this->line('╔════════════════════════════════════════════════════════════╗');
-        $this->line('║ ' . $this->formatTeams($prediction->teams, 58) . ' ║');
+        $this->line('║ ' . $this->formatTeams($prediction->match, 58) . ' ║');
         $this->line('╠════════════════════════════════════════════════════════════╣');
-        $this->line('║ Date: ' . $this->formatDate($prediction->match_date, 52) . ' ║');
-        $this->line('║ Tip:  ' . $this->formatTip($prediction->tips, 52) . ' ║');
-        $this->line('║ Odds: ' . $this->formatOdds($prediction->odds, 52) . ' ║');
-        $this->line('║ Status: ' . $this->formatSelected($prediction->selected, 50) . ' ║');
+        $this->line('║ Date: ' . $this->formatDate($prediction->date, 52) . ' ║');
+        $this->line('║ Country: ' . str_pad($prediction->country, 50) . ' ║');
+        $this->line('║ Tips: ' . $this->formatTips($prediction->tips, 52) . ' ║');
         $this->line('╚════════════════════════════════════════════════════════════╝');
         $this->newLine();
     }
@@ -137,17 +141,13 @@ class ShowPredictions extends Command
         $this->newLine();
 
         $totalPredictions = $predictions->count();
-        $selectedPredictions = $predictions->where('selected', true)->count();
-        $averageOdds = $predictions->whereNotNull('odds')->avg('odds');
+        $totalTips = $predictions->sum(function($p) {
+            return count($p->tips);
+        });
 
         $this->line('╔════════════════════════════════════════════════════════════╗');
         $this->line('║ Total Predictions: ' . str_pad($totalPredictions, 39) . ' ║');
-        $this->line('║ Selected Predictions: ' . str_pad($selectedPredictions, 36) . ' ║');
-        
-        if ($averageOdds) {
-            $this->line('║ Average Odds: ' . str_pad(number_format($averageOdds, 2), 43) . ' ║');
-        }
-        
+        $this->line('║ Total Tips: ' . str_pad($totalTips, 45) . ' ║');
         $this->line('╚════════════════════════════════════════════════════════════╝');
         $this->newLine();
     }
@@ -160,39 +160,16 @@ class ShowPredictions extends Command
 
     protected function formatDate($date, $length = null)
     {
-        $formatted = $date->format('Y-m-d H:i');
+        $formatted = Carbon::parse($date)->format('Y-m-d H:i');
         return $length ? str_pad($formatted, $length) : $formatted;
     }
 
-    protected function formatTip($tip, $length = null)
+    protected function formatTips($tips, $length = null)
     {
-        $formatted = match($tip) {
-            '1' => '🏠 Home Win',
-            'X' => '🤝 Draw',
-            '2' => '✈️ Away Win',
-            default => $tip
-        };
-        return $length ? str_pad($formatted, $length) : $formatted;
-    }
-
-    protected function formatOdds($odds, $length = null)
-    {
-        if (!$odds) return $length ? str_pad('N/A', $length) : 'N/A';
+        $formatted = collect($tips)->map(function($tip) {
+            return $tip['option'] . ($tip['odd'] ? ' (' . number_format($tip['odd'], 2) . ')' : '');
+        })->join(', ');
         
-        $formatted = number_format($odds, 2);
-        $color = match(true) {
-            $odds >= 2.5 => 'green',
-            $odds >= 1.5 => 'yellow',
-            default => 'red'
-        };
-        
-        $formatted = "<fg={$color}>{$formatted}</>";
-        return $length ? str_pad($formatted, $length) : $formatted;
-    }
-
-    protected function formatSelected($selected, $length = null)
-    {
-        $formatted = $selected ? '✅ Selected' : '❌ Not Selected';
         return $length ? str_pad($formatted, $length) : $formatted;
     }
 } 

@@ -14,7 +14,8 @@ class AdibetScraper
 {
     protected $client;
     protected $baseUrl = 'https://www.adibet.com';
-    protected $maxMatches = 5;
+    protected $maxRetries = 3;
+    protected $retryDelay = 5; // seconds
 
     // Define leagues by tier
     protected $leagueTiers = [
@@ -52,6 +53,20 @@ class AdibetScraper
         ]
     ];
 
+    // Define prediction types
+    protected $predictionTypes = [
+        '1' => 'Home Win',
+        'X' => 'Draw',
+        '2' => 'Away Win',
+        '-2.5' => 'Under 2.5',
+        '+2.5' => 'Over 2.5',
+        'GG' => 'Both Teams to Score',
+        'NG' => 'No Goals',
+        '1X' => 'Home Win or Draw',
+        'X2' => 'Draw or Away Win',
+        '12' => 'Home Win or Away Win'
+    ];
+
     public function __construct()
     {
         $this->client = new Client([
@@ -69,22 +84,42 @@ class AdibetScraper
 
     public function fetchPredictions()
     {
+        $retries = 0;
+        while ($retries < $this->maxRetries) {
         try {
-            Log::info('Starting to fetch predictions from Adibet');
+                Log::info('Starting to fetch predictions from Adibet (Attempt ' . ($retries + 1) . ')');
 
             $response = $this->client->get($this->baseUrl);
             $html = $response->getBody()->getContents();
             
-            if (empty($html)) {
-                throw new \Exception('Received empty response from Adibet');
-            }
+                if (empty($html)) {
+                    throw new \Exception('Received empty response from Adibet');
+                }
 
-            Log::info('Successfully fetched HTML from Adibet');
+                // Save HTML for debugging
+                $this->saveHtmlForDebugging($html);
+
+                Log::info('Successfully fetched HTML from Adibet');
             return $this->parsePredictions($html);
         } catch (\Exception $e) {
-            Log::error('Error fetching predictions: ' . $e->getMessage());
-            throw $e;
+                $retries++;
+                Log::error('Error fetching predictions (Attempt ' . $retries . '): ' . $e->getMessage());
+                
+                if ($retries < $this->maxRetries) {
+                    Log::info('Retrying in ' . $this->retryDelay . ' seconds...');
+                    sleep($this->retryDelay);
+                } else {
+                    throw $e;
+                }
+            }
         }
+    }
+
+    protected function saveHtmlForDebugging($html)
+    {
+        $filename = storage_path('logs/adibet_' . now()->format('Y-m-d_H-i-s') . '.html');
+        file_put_contents($filename, $html);
+        Log::info('Saved HTML for debugging: ' . $filename);
     }
 
     protected function parsePredictions($html)
@@ -96,92 +131,210 @@ class AdibetScraper
         // Format today's date in Adibet format (e.g. "16 - 05 - 2025")
         $today = Carbon::now()->format('d - m - Y');
         $currentDate = null;
-        $isTodaySection = false;
 
+        try {
         // First find all date headers
-        $dateHeaders = $crawler->filter('font[color="#C0C0C0"]')->each(function (Crawler $node) {
+            $dateHeaders = $crawler->filter('tr:contains("' . $today . '")')->each(function (Crawler $node) {
             return trim($node->text());
         });
 
-        // Then process each table
-        $crawler->filter('table')->each(function (Crawler $table) use (&$predictions, &$currentDate, &$processedMatches) {
-            // Check if this is a date header table
-            $dateHeader = $table->filter('font[color="#C0C0C0"]');
-            if ($dateHeader->count() > 0) {
-                $rawDate = trim($dateHeader->text());
-                $dateMatch = preg_match('/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/', $rawDate, $matches);
+            Log::info('Found date headers: ' . json_encode($dateHeaders));
+
+            // Then process each table row
+            $crawler->filter('tr')->each(function (Crawler $row) use (&$predictions, &$currentDate, &$processedMatches) {
+                $rowText = trim($row->text());
                 
-                if ($dateMatch) {
+                // Check if this is a date header
+                if (preg_match('/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/', $rowText, $matches)) {
                     $currentDate = Carbon::createFromFormat('d - m - Y', $matches[0])->format('Y-m-d');
                     Log::info("Processing matches for date: {$currentDate}");
-                }
                 return;
             }
 
-            // Process match rows
-            $table->filter('tr')->each(function (Crawler $row) use (&$predictions, $currentDate, &$processedMatches) {
-                if ($row->filter('th')->count() > 0) {
-                    return; // Skip header rows
-                }
+                // Skip if no date found yet
+                if (!$currentDate) {
+                return;
+            }
 
-                try {
-                    // Get country from image alt
-                    $country = $row->filter('img')->attr('alt') ?? 'Unknown';
-
-                    // Get teams from yellow text
-                    $teamsText = $row->filter('font[color="#D5B438"]')->text();
-                    $teams = explode(' - ', $teamsText);
-                    
-                    if (count($teams) !== 2) {
-                        return; // Skip invalid team format
+                // Skip if this is a header row or social media links
+                if (str_contains($rowText, 'Link to') || str_contains($rowText, 'Telegram')) {
+                        return;
                     }
 
-                    $teamHome = trim($teams[0]);
-                    $teamAway = trim($teams[1]);
-                    $matchId = Str::slug("{$teamHome}-vs-{$teamAway}-{$currentDate}");
+                // Parse match data
+                $columns = $row->filter('td')->each(function (Crawler $cell) {
+                    return trim($cell->text());
+                });
 
+                if (count($columns) < 3) {
+                    return; // Skip invalid rows
+                }
+
+                // Get country from image alt text
+                $country = $row->filter('td')->eq(0)->filter('img')->attr('alt');
+                if (!$country) {
+                    return; // Skip if no country found
+                }
+
+                $matchText = $columns[1];
+                $teams = explode(' - ', $matchText);
+                
+                if (count($teams) !== 2) {
+                    return; // Skip invalid team format
+                }
+
+                $teamHome = trim($teams[0]);
+                $teamAway = trim($teams[1]);
+                $matchId = Str::slug("{$teamHome}-vs-{$teamAway}-{$currentDate}");
+                    
                     // Skip if we've already processed this match
                     if (in_array($matchId, $processedMatches)) {
                         return;
                     }
-
+                    
                     $processedMatches[] = $matchId;
 
-                    // Get tips
-                    $tips = [];
-                    $row->filter('td[bgcolor="#272727"]')->each(function (Crawler $cell) use (&$tips) {
-                        $tip = $cell->filter('font[color="#D5B438"]')->text();
-                        if (!empty($tip)) {
+                // Get predictions (highlighted ones)
+                $tips = [];
+                for ($i = 2; $i < count($columns); $i++) {
+                    $tip = trim($columns[$i]);
+                    if (isset($this->predictionTypes[$tip])) {
+                        // Check if this cell has a background color (highlighted)
+                        $isHighlighted = $row->filter('td')->eq($i)->attr('bgcolor') === '#272727' && 
+                                       $row->filter('td')->eq($i)->filter('font')->attr('color') === '#D5B438';
+                        
                             $tips[] = [
                                 'option' => $tip,
-                                'odd' => null // We don't have odds from Adibet
+                            'name' => $this->predictionTypes[$tip],
+                            'selected' => $isHighlighted // This is a highlighted prediction
                             ];
                         }
-                    });
+                }
 
                     if (empty($tips)) {
                         return;
                     }
+
+                // Calculate match score
+                $score = $this->calculateMatchScore($country, $matchText, count($tips));
                     
                     $predictions[] = [
                         'match_id' => $matchId,
-                        'match' => "{$teamHome} vs {$teamAway}",
+                    'match' => "{$teamHome} vs {$teamAway}",
                         'country' => $country,
-                        'date' => $currentDate,
+                    'league' => $this->getLeagueName($country, $teamHome, $teamAway),
+                    'date' => $currentDate,
                         'tips' => $tips,
+                    'score' => $score,
                         'raw_data' => json_encode([
                             'html' => $row->outerHtml(),
                             'timestamp' => now()->toIso8601String()
                         ])
                     ];
-                } catch (\Exception $e) {
-                    Log::error('Error parsing prediction row: ' . $e->getMessage());
-                }
-            });
-        });
 
-        Log::info('Successfully parsed ' . count($predictions) . ' predictions');
-        return $predictions;
+                Log::info("Successfully parsed match: {$teamHome} vs {$teamAway} with score {$score}");
+            });
+
+            Log::info('Successfully parsed ' . count($predictions) . ' predictions');
+            return $predictions;
+                } catch (\Exception $e) {
+            Log::error('Error parsing predictions: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    protected function getLeagueName($country, $teamHome, $teamAway)
+    {
+        // Map teams to leagues
+        $teamLeagues = [
+            'England' => [
+                'Premier League' => ['Manchester United', 'Manchester City', 'Liverpool', 'Arsenal', 'Chelsea', 'Tottenham', 'Crystal Palace'],
+                'Championship' => ['Leeds', 'Leicester', 'Southampton', 'Norwich']
+            ],
+            'Germany' => [
+                'Bundesliga' => ['Bayern Munich', 'Borussia Dortmund', 'RB Leipzig', 'Bayer Leverkusen', 'Wolfsburg', 'Hoffenheim', 'B. Monchengladbach'],
+                '2. Bundesliga' => ['Holstein Kiel', 'St. Pauli', 'Hamburg']
+            ],
+            'Spain' => [
+                'La Liga' => ['Barcelona', 'Real Madrid', 'Atletico Madrid', 'Sevilla', 'Valencia'],
+                'La Liga 2' => ['Almeria', 'Leganes', 'Valladolid']
+            ],
+            'Italy' => [
+                'Serie A' => ['Milan', 'Inter', 'Juventus', 'Napoli', 'Roma', 'Lazio', 'Atalanta', 'Genoa'],
+                'Serie B' => ['Parma', 'Brescia', 'Cosenza']
+            ],
+            'France' => [
+                'Ligue 1' => ['PSG', 'Marseille', 'Lyon', 'Monaco', 'Lille', 'Reims', 'Angers'],
+                'Ligue 2' => ['Auxerre', 'Bordeaux', 'Grenoble']
+            ],
+            'Netherlands' => [
+                'Eredivisie' => ['Ajax', 'PSV', 'Feyenoord', 'AZ']
+            ],
+            'Portugal' => [
+                'Primeira Liga' => ['Benfica', 'Porto', 'Sporting', 'Braga', 'Vitoria Guimaraes', 'Nacional']
+            ],
+            'Turkey' => [
+                'Super Lig' => ['Galatasaray', 'Fenerbahce', 'Besiktas', 'Trabzonspor']
+            ],
+            'Belgium' => [
+                'Pro League' => ['Antwerp', 'Royale Union SG', 'Club Brugge', 'Anderlecht']
+            ],
+            'Scotland' => [
+                'Premiership' => ['Celtic', 'Rangers', 'Aberdeen', 'Hibernian', 'St. Mirren']
+            ]
+        ];
+
+        if (isset($teamLeagues[$country])) {
+            foreach ($teamLeagues[$country] as $league => $teams) {
+                if (in_array($teamHome, $teams) || in_array($teamAway, $teams)) {
+                    return $league;
+                }
+            }
+        }
+
+        return 'Unknown League';
+    }
+
+    protected function calculateMatchScore($country, $match, $tipCount)
+    {
+        $score = 0;
+        
+        // Score based on country/league
+        foreach ($this->leagueScores as $tier => $countries) {
+            if (isset($countries[$country])) {
+                $score += $countries[$country];
+                break;
+            }
+        }
+
+        // Score based on match importance
+        if ($this->isImportantMatch($match)) {
+            $score += 2;
+        }
+
+        // Score based on number of tips
+        $score += $tipCount * 0.5;
+
+        return $score;
+    }
+
+    protected function isImportantMatch($match)
+    {
+        // List of important matches/derbies
+        $importantMatches = [
+            'manchester united vs manchester city',
+            'liverpool vs everton',
+            'arsenal vs tottenham',
+            'barcelona vs real madrid',
+            'bayern munich vs borussia dortmund',
+            'milan vs inter',
+            'psg vs marseille',
+            'celtic vs rangers',
+            'benfica vs porto',
+            'ajax vs psv'
+        ];
+
+        return in_array(strtolower($match), $importantMatches);
     }
 
     public function savePredictions($predictions)
@@ -192,6 +345,7 @@ class AdibetScraper
                 ['match_id' => $prediction['match_id']],
                 $prediction
             );
+                Log::info("Successfully saved prediction for match: {$prediction['match']}");
             } catch (\Exception $e) {
                 Log::error('Error saving prediction: ' . $e->getMessage());
             }
@@ -251,65 +405,16 @@ class AdibetScraper
             return $item['match'];
         });
 
-        return $scoredMatches->values()->all();
-    }
-
-    protected function isImportantMatch($match)
-    {
-        $importantMatches = [
-            // Top Tier
-            'Manchester' => ['United', 'City'],
-            'Arsenal' => ['Tottenham', 'Chelsea'],
-            'Liverpool' => ['Manchester', 'Chelsea', 'Arsenal'],
-            'Bayern' => ['Dortmund', 'Leipzig'],
-            'Dortmund' => ['Schalke'],
-            'Barcelona' => ['Real Madrid', 'Atletico'],
-            'Real Madrid' => ['Atletico'],
-            'Milan' => ['Inter', 'Juventus'],
-            'Inter' => ['Juventus'],
-            'Roma' => ['Lazio'],
-            'PSG' => ['Marseille', 'Lyon'],
-            'Marseille' => ['Lyon'],
-
-            // Moderate Tier
-            'Ajax' => ['PSV', 'Feyenoord'],
-            'Benfica' => ['Porto', 'Sporting'],
-            'Galatasaray' => ['Fenerbahce', 'Besiktas'],
-            'Anderlecht' => ['Club Brugge'],
-            'Celtic' => ['Rangers']
-        ];
-
-        foreach ($importantMatches as $team => $rivals) {
-            if (stripos($match, $team) !== false) {
-                foreach ($rivals as $rival) {
-                    if (stripos($match, $rival) !== false) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
+        return $scoredMatches->toArray();
     }
 
     public function getRandomPrediction()
     {
-        // Get best matches first
-        $bestMatches = $this->getBestMatches(5);
-        if (empty($bestMatches)) {
+        $predictions = $this->fetchPredictions();
+        if (empty($predictions)) {
             return null;
-        }
+                }
 
-        // Get a random match from best matches
-        $match = collect($bestMatches)->random();
-        
-        // Get a random tip from the match
-        $tip = collect($match['tips'])->random();
-
-        return [
-            'match' => $match['match'],
-            'country' => $match['country'],
-            'tip' => $tip['option']
-        ];
+        return $predictions[array_rand($predictions)];
     }
 } 

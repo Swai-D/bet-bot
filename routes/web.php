@@ -26,7 +26,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Scraper routes
     Route::post('/dashboard/scraper/run', [App\Http\Controllers\ScraperController::class, 'run'])
         ->name('scraper.run');
-
+    
     // API Routes
     Route::post('/dashboard/bets/place', [DashboardController::class, 'placeBets'])->name('bets.place');
     Route::post('/dashboard/settings/update', [DashboardController::class, 'updateSettings'])->name('settings.update');

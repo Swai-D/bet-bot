@@ -12,17 +12,25 @@ class Prediction extends Model
         'match',
         'country',
         'date',
-        'tips',
+        'score',
         'raw_data',
         'selected'
     ];
 
     protected $casts = [
-        'date' => 'date',
-        'tips' => 'array',
-        'raw_data' => 'array',
+        'date' => 'datetime',
+        'raw_data' => 'json',
+        'score' => 'float',
         'selected' => 'boolean'
     ];
+
+    /**
+     * Get the tips associated with the prediction.
+     */
+    public function tips(): HasMany
+    {
+        return $this->hasMany(Tip::class);
+    }
 
     /**
      * Get the bets associated with the prediction.
@@ -61,6 +69,21 @@ class Prediction extends Model
      */
     public function getMatchNameAttribute(): string
     {
-        return "{$this->team_home} vs {$this->team_away}";
+        return $this->match;
+    }
+
+    public function getFormattedDateAttribute()
+    {
+        return $this->date->format('Y-m-d H:i:s');
+    }
+
+    public function getLeagueTierAttribute()
+    {
+        if ($this->score >= 4) {
+            return 'top';
+        } elseif ($this->score >= 2) {
+            return 'moderate';
+        }
+        return 'other';
     }
 }

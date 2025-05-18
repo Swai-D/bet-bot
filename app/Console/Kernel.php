@@ -7,6 +7,11 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
+    protected $commands = [
+        Commands\BackupPredictionsCommand::class,
+        Commands\CleanupPredictionsCommand::class,
+    ];
+
     protected function schedule(Schedule $schedule)
     {
         // Run betting bot every 5 minutes
@@ -22,6 +27,12 @@ class Kernel extends ConsoleKernel
             ->daily()
             ->at('00:00')
             ->appendOutputTo(storage_path('logs/cleanup.log'));
+
+        // Schedule backup command to run daily at midnight
+        $schedule->command('predictions:backup')->daily();
+        
+        // Schedule cleanup command to run weekly
+        $schedule->command('predictions:cleanup')->weekly();
     }
 
     protected function commands()

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\AdibetScraper;
+use Illuminate\Support\Facades\Log;
 
 class SavePredictions extends Command
 {
@@ -13,6 +14,7 @@ class SavePredictions extends Command
     public function handle()
     {
         $this->info('Starting to fetch and save predictions from Adibet...');
+        Log::info('Starting predictions fetch and save process');
         
         try {
             $scraper = new AdibetScraper();
@@ -23,10 +25,12 @@ class SavePredictions extends Command
             
             if (empty($predictions)) {
                 $this->error('No predictions found!');
-                return 1;
+                Log::warning('No predictions found from Adibet');
+                return Command::FAILURE;
             }
             
             $this->info('Found ' . count($predictions) . ' predictions');
+            Log::info('Fetched predictions', ['count' => count($predictions)]);
             
             // Save predictions
             $this->info('Saving predictions to database...');
@@ -37,10 +41,17 @@ class SavePredictions extends Command
             $this->info('- Skipped: ' . $result['skipped']);
             $this->info('- Errors: ' . $result['errors']);
             
-            return 0;
+            Log::info('Predictions saved successfully', $result);
+            
+            return Command::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
-            return 1;
+            $errorMessage = 'Error: ' . $e->getMessage();
+            $this->error($errorMessage);
+            Log::error($errorMessage, [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return Command::FAILURE;
         }
     }
 } 

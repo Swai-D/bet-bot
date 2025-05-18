@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BettingController;
 use App\Http\Controllers\PredictionController;
+use App\Http\Controllers\AutomationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,4 +26,10 @@ Route::prefix('betting')->group(function () {
 Route::prefix('predictions')->group(function () {
     Route::get('/', [PredictionController::class, 'index']);
     Route::post('/run-scraper', [PredictionController::class, 'runScraper']);
+});
+
+// Betting Automation Routes
+Route::prefix('automation')->group(function () {
+    Route::post('/start', [AutomationController::class, 'start']);
+    Route::get('/status', [AutomationController::class, 'status']);
 }); 

@@ -50,4 +50,10 @@ return [
         'key' => env('ODDS_API_KEY'),
     ],
 
+    'betpawa' => [
+        'phone' => env('BETPAWA_PHONE'),
+        'password' => env('BETPAWA_PASSWORD'),
+        'session_id' => env('BETPAWA_SESSION_ID'),
+    ],
+
 ];

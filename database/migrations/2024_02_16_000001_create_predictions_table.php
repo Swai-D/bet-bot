@@ -13,8 +13,10 @@ return new class extends Migration
             $table->string('match_id')->unique();
             $table->string('match');
             $table->string('country');
+            $table->string('league')->default('Unknown League');
             $table->dateTime('date');
             $table->float('score')->default(0);
+            $table->json('tips')->nullable();
             $table->json('raw_data')->nullable();
             $table->timestamps();
         });

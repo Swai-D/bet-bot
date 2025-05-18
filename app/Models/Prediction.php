@@ -11,26 +11,19 @@ class Prediction extends Model
         'match_id',
         'match',
         'country',
+        'league',
         'date',
         'score',
-        'raw_data',
-        'selected'
+        'tips',
+        'raw_data'
     ];
 
     protected $casts = [
         'date' => 'datetime',
         'raw_data' => 'json',
-        'score' => 'float',
-        'selected' => 'boolean'
+        'tips' => 'json',
+        'score' => 'float'
     ];
-
-    /**
-     * Get the tips associated with the prediction.
-     */
-    public function tips(): HasMany
-    {
-        return $this->hasMany(Tip::class);
-    }
 
     /**
      * Get the bets associated with the prediction.
@@ -54,14 +47,6 @@ class Prediction extends Model
     public function scopeForCountry($query, $country)
     {
         return $query->where('country', $country);
-    }
-
-    /**
-     * Scope a query to only include selected predictions.
-     */
-    public function scopeSelected($query)
-    {
-        return $query->where('selected', true);
     }
 
     /**

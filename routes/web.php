@@ -6,6 +6,7 @@ use App\Http\Controllers\SettingsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\AutomationController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -41,6 +42,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
     Route::get('/api/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/api/settings', [SettingsController::class, 'update'])->name('settings.update');
+});
+
+// Automation Dashboard
+Route::get('/automation', function () {
+    return view('automation');
 });
 
 require __DIR__.'/auth.php';

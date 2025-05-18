@@ -365,7 +365,7 @@ class AdibetScraper
                     continue;
                 }
 
-                // Create or update the prediction
+                // Create or update the prediction with tips included
                 $savedPrediction = Prediction::updateOrCreate(
                     ['match_id' => $prediction['match_id']],
                     [
@@ -374,26 +374,10 @@ class AdibetScraper
                         'league' => $prediction['league'] ?? 'Unknown League',
                         'date' => $prediction['date'],
                         'score' => $prediction['score'] ?? 0,
+                        'tips' => $prediction['tips'],
                         'raw_data' => $prediction['raw_data'] ?? null
                     ]
                 );
-
-                // Handle tips separately to avoid duplicates
-                if (isset($prediction['tips']) && is_array($prediction['tips'])) {
-                    foreach ($prediction['tips'] as $tip) {
-                        $savedPrediction->tips()->updateOrCreate(
-                            [
-                                'prediction_id' => $savedPrediction->id,
-                                'option' => $tip['option']
-                            ],
-                            [
-                                'name' => $tip['name'] ?? $this->predictionTypes[$tip['option']] ?? 'Unknown',
-                                'odd' => $tip['odd'] ?? null,
-                                'selected' => $tip['selected'] ?? false
-                            ]
-                        );
-                    }
-                }
 
                 Log::info("Successfully saved prediction for match: {$prediction['match']} with " . count($prediction['tips']) . " tips");
                 $savedCount++;

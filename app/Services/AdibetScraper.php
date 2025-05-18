@@ -86,12 +86,12 @@ class AdibetScraper
     {
         $retries = 0;
         while ($retries < $this->maxRetries) {
-        try {
+            try {
                 Log::info('Starting to fetch predictions from Adibet (Attempt ' . ($retries + 1) . ')');
 
-            $response = $this->client->get($this->baseUrl);
-            $html = $response->getBody()->getContents();
-            
+                $response = $this->client->get($this->baseUrl);
+                $html = $response->getBody()->getContents();
+                
                 if (empty($html)) {
                     throw new \Exception('Received empty response from Adibet');
                 }
@@ -100,8 +100,17 @@ class AdibetScraper
                 $this->saveHtmlForDebugging($html);
 
                 Log::info('Successfully fetched HTML from Adibet');
-            return $this->parsePredictions($html);
-        } catch (\Exception $e) {
+                
+                $predictions = $this->parsePredictions($html);
+                
+                if (empty($predictions)) {
+                    throw new \Exception('No predictions found in the parsed data');
+                }
+                
+                Log::info('Successfully parsed ' . count($predictions) . ' predictions');
+                return $predictions;
+                
+            } catch (\Exception $e) {
                 $retries++;
                 Log::error('Error fetching predictions (Attempt ' . $retries . '): ' . $e->getMessage());
                 
@@ -109,6 +118,7 @@ class AdibetScraper
                     Log::info('Retrying in ' . $this->retryDelay . ' seconds...');
                     sleep($this->retryDelay);
                 } else {
+                    Log::error('Failed to fetch predictions after ' . $this->maxRetries . ' attempts');
                     throw $e;
                 }
             }
@@ -339,17 +349,66 @@ class AdibetScraper
 
     public function savePredictions($predictions)
     {
+        $today = Carbon::now()->format('Y-m-d');
+        $savedCount = 0;
+        $skippedCount = 0;
+        $errorCount = 0;
+        
+        Log::info("Starting to save " . count($predictions) . " predictions");
+        
         foreach ($predictions as $prediction) {
             try {
-            Prediction::updateOrCreate(
-                ['match_id' => $prediction['match_id']],
-                $prediction
-            );
-                Log::info("Successfully saved prediction for match: {$prediction['match']}");
+                // Only save predictions for today and future dates
+                if (Carbon::parse($prediction['date'])->lt($today)) {
+                    Log::info("Skipping past prediction for match: {$prediction['match']}");
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Create or update the prediction
+                $savedPrediction = Prediction::updateOrCreate(
+                    ['match_id' => $prediction['match_id']],
+                    [
+                        'match' => $prediction['match'],
+                        'country' => $prediction['country'],
+                        'league' => $prediction['league'] ?? 'Unknown League',
+                        'date' => $prediction['date'],
+                        'score' => $prediction['score'] ?? 0,
+                        'raw_data' => $prediction['raw_data'] ?? null
+                    ]
+                );
+
+                // Handle tips separately to avoid duplicates
+                if (isset($prediction['tips']) && is_array($prediction['tips'])) {
+                    foreach ($prediction['tips'] as $tip) {
+                        $savedPrediction->tips()->updateOrCreate(
+                            [
+                                'prediction_id' => $savedPrediction->id,
+                                'option' => $tip['option']
+                            ],
+                            [
+                                'name' => $tip['name'] ?? $this->predictionTypes[$tip['option']] ?? 'Unknown',
+                                'odd' => $tip['odd'] ?? null,
+                                'selected' => $tip['selected'] ?? false
+                            ]
+                        );
+                    }
+                }
+
+                Log::info("Successfully saved prediction for match: {$prediction['match']} with " . count($prediction['tips']) . " tips");
+                $savedCount++;
             } catch (\Exception $e) {
-                Log::error('Error saving prediction: ' . $e->getMessage());
+                Log::error('Error saving prediction for match ' . ($prediction['match'] ?? 'unknown') . ': ' . $e->getMessage());
+                $errorCount++;
             }
         }
+
+        Log::info("Prediction saving completed: {$savedCount} saved, {$skippedCount} skipped, {$errorCount} errors");
+        return [
+            'saved' => $savedCount,
+            'skipped' => $skippedCount,
+            'errors' => $errorCount
+        ];
     }
 
     public function getBestMatches($limit = 5)
@@ -413,8 +472,27 @@ class AdibetScraper
         $predictions = $this->fetchPredictions();
         if (empty($predictions)) {
             return null;
-                }
+        }
 
         return $predictions[array_rand($predictions)];
+    }
+
+    /**
+     * Clean up old predictions that are no longer relevant
+     * 
+     * @param int $daysToKeep Number of days to keep predictions
+     * @return int Number of predictions deleted
+     */
+    public function cleanupOldPredictions($daysToKeep = 7)
+    {
+        $cutoffDate = Carbon::now()->subDays($daysToKeep);
+        
+        $deletedCount = Prediction::where('date', '<', $cutoffDate)
+            ->whereDoesntHave('bets') // Don't delete predictions that have bets
+            ->delete();
+            
+        Log::info("Cleaned up {$deletedCount} old predictions");
+        
+        return $deletedCount;
     }
 } 

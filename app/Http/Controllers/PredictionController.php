@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Prediction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use App\Services\AdibetScraper;
 
 class PredictionController extends Controller
 {
@@ -40,6 +41,45 @@ class PredictionController extends Controller
         // Get predictions with pagination
         $predictions = $query->latest()->get();
 
-        return response()->json($predictions);
+        return response()->json([
+            'success' => true,
+            'predictions' => $predictions
+        ]);
+    }
+
+    /**
+     * Run the scraper and save predictions
+     */
+    public function runScraper()
+    {
+        try {
+            $scraper = new AdibetScraper();
+            
+            // Fetch and save predictions
+            $predictions = $scraper->fetchPredictions();
+            $result = $scraper->savePredictions($predictions);
+            
+            // Get latest predictions after saving
+            $latestPredictions = Prediction::with('tips')
+                ->whereDate('date', '>=', now())
+                ->latest()
+                ->get();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully scraped and saved predictions',
+                'data' => [
+                    'saved' => $result['saved'],
+                    'skipped' => $result['skipped'],
+                    'errors' => $result['errors']
+                ],
+                'predictions' => $latestPredictions
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to scrape predictions: ' . $e->getMessage()
+            ], 500);
+        }
     }
 } 

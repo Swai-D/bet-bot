@@ -21,4 +21,8 @@ Route::prefix('betting')->group(function () {
     Route::post('/place-bet', [BettingController::class, 'placeBet']);
 });
 
-Route::get('/predictions', [PredictionController::class, 'index']); 
+// Predictions API Routes
+Route::prefix('predictions')->group(function () {
+    Route::get('/', [PredictionController::class, 'index']);
+    Route::post('/run-scraper', [PredictionController::class, 'runScraper']);
+}); 

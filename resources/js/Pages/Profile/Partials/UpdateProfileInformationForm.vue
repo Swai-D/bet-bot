@@ -4,6 +4,8 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Inertia } from '@inertiajs/inertia';
 
 defineProps({
     mustVerifyEmail: {
@@ -20,6 +22,33 @@ const form = useForm({
     name: user.name,
     email: user.email,
 });
+
+const preview = ref(user.avatar || '/images/default-avatar.png');
+const avatarFile = ref(null);
+
+function onFileChange(e) {
+  const file = e.target.files[0];
+  if (file) {
+    avatarFile.value = file;
+    preview.value = URL.createObjectURL(file);
+  }
+}
+
+function submitForm() {
+  const data = new FormData();
+  data.append('name', form.name);
+  data.append('email', form.email);
+  if (avatarFile.value) {
+    data.append('avatar', avatarFile.value);
+  }
+  form.post(route('profile.update'), {
+    data,
+    forceFormData: true,
+    onSuccess: () => {
+      Inertia.reload({ only: ['auth'] });
+    },
+  });
+}
 </script>
 
 <template>
@@ -34,8 +63,10 @@ const form = useForm({
             </p>
         </header>
 
+        <slot></slot>
+
         <form
-            @submit.prevent="form.patch(route('profile.update'))"
+            @submit.prevent="submitForm"
             class="mt-6 space-y-6"
         >
             <div>
@@ -67,6 +98,13 @@ const form = useForm({
                 />
 
                 <InputError class="mt-2" :message="form.errors.email" />
+            </div>
+
+            <div class="mb-4">
+              <InputLabel for="avatar" value="Avatar" />
+              <input id="avatar" name="avatar" type="file" accept="image/*" @change="onFileChange" class="block mt-1" />
+              <img v-if="preview" :src="preview" class="h-20 w-20 rounded-full mt-2 object-cover" />
+              <InputError class="mt-2" :message="form.errors.avatar" />
             </div>
 
             <div v-if="mustVerifyEmail && user.email_verified_at === null">

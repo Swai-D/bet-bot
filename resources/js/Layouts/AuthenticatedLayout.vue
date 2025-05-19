@@ -49,7 +49,8 @@ const showingNavigationDropdown = ref(false);
                             <div class="ms-3 relative">
                                 <Dropdown align="right" width="48">
                                     <template #trigger>
-                                        <span class="inline-flex rounded-md">
+                                        <span class="inline-flex rounded-md items-center">
+                                            <img :src="$page.props.auth.user.avatar" alt="Profile Avatar" class="h-8 w-8 rounded-full object-cover border border-gray-700 ml-2" />
                                             <button
                                                 type="button"
                                                 class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-300 bg-gray-900 hover:text-white focus:outline-none transition ease-in-out duration-150"

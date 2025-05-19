@@ -138,15 +138,15 @@ class AdibetScraper
         $predictions = [];
         $processedMatches = []; // Track processed matches to avoid duplicates
         
-        // Format today's date in Adibet format (e.g. "16 - 05 - 2025")
+        // Format today's date in Adibet format (e.g. "16 - 05 - 2024")
         $today = Carbon::now()->format('d - m - Y');
         $currentDate = null;
 
         try {
-        // First find all date headers
+            // First find all date headers
             $dateHeaders = $crawler->filter('tr:contains("' . $today . '")')->each(function (Crawler $node) {
-            return trim($node->text());
-        });
+                return trim($node->text());
+            });
 
             Log::info('Found date headers: ' . json_encode($dateHeaders));
 
@@ -158,18 +158,18 @@ class AdibetScraper
                 if (preg_match('/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/', $rowText, $matches)) {
                     $currentDate = Carbon::createFromFormat('d - m - Y', $matches[0])->format('Y-m-d');
                     Log::info("Processing matches for date: {$currentDate}");
-                return;
-            }
+                    return;
+                }
 
                 // Skip if no date found yet
                 if (!$currentDate) {
-                return;
-            }
+                    return;
+                }
 
                 // Skip if this is a header row or social media links
                 if (str_contains($rowText, 'Link to') || str_contains($rowText, 'Telegram')) {
-                        return;
-                    }
+                    return;
+                }
 
                 // Parse match data
                 $columns = $row->filter('td')->each(function (Crawler $cell) {
@@ -197,12 +197,12 @@ class AdibetScraper
                 $teamAway = trim($teams[1]);
                 $matchId = Str::slug("{$teamHome}-vs-{$teamAway}-{$currentDate}");
                     
-                    // Skip if we've already processed this match
-                    if (in_array($matchId, $processedMatches)) {
-                        return;
-                    }
+                // Skip if we've already processed this match
+                if (in_array($matchId, $processedMatches)) {
+                    return;
+                }
                     
-                    $processedMatches[] = $matchId;
+                $processedMatches[] = $matchId;
 
                 // Get predictions (highlighted ones)
                 $tips = [];
@@ -213,41 +213,41 @@ class AdibetScraper
                         $isHighlighted = $row->filter('td')->eq($i)->attr('bgcolor') === '#272727' && 
                                        $row->filter('td')->eq($i)->filter('font')->attr('color') === '#D5B438';
                         
-                            $tips[] = [
-                                'option' => $tip,
+                        $tips[] = [
+                            'option' => $tip,
                             'name' => $this->predictionTypes[$tip],
                             'selected' => $isHighlighted // This is a highlighted prediction
-                            ];
-                        }
+                        ];
+                    }
                 }
 
-                    if (empty($tips)) {
-                        return;
-                    }
+                if (empty($tips)) {
+                    return;
+                }
 
                 // Calculate match score
                 $score = $this->calculateMatchScore($country, $matchText, count($tips));
                     
-                    $predictions[] = [
-                        'match_id' => $matchId,
+                $predictions[] = [
+                    'match_id' => $matchId,
                     'match' => "{$teamHome} vs {$teamAway}",
-                        'country' => $country,
+                    'country' => $country,
                     'league' => $this->getLeagueName($country, $teamHome, $teamAway),
                     'date' => $currentDate,
-                        'tips' => $tips,
+                    'tips' => $tips,
                     'score' => $score,
-                        'raw_data' => json_encode([
-                            'html' => $row->outerHtml(),
-                            'timestamp' => now()->toIso8601String()
-                        ])
-                    ];
+                    'raw_data' => json_encode([
+                        'html' => $row->outerHtml(),
+                        'timestamp' => now()->toIso8601String()
+                    ])
+                ];
 
                 Log::info("Successfully parsed match: {$teamHome} vs {$teamAway} with score {$score}");
             });
 
             Log::info('Successfully parsed ' . count($predictions) . ' predictions');
             return $predictions;
-                } catch (\Exception $e) {
+        } catch (\Exception $e) {
             Log::error('Error parsing predictions: ' . $e->getMessage());
             throw $e;
         }
@@ -358,12 +358,12 @@ class AdibetScraper
         
         foreach ($predictions as $prediction) {
             try {
-                // Only save predictions for today and future dates
-                if (Carbon::parse($prediction['date'])->lt($today)) {
-                    Log::info("Skipping past prediction for match: {$prediction['match']}");
-                    $skippedCount++;
-                    continue;
-                }
+                // Log prediction details
+                Log::info("Processing prediction:", [
+                    'match' => $prediction['match'],
+                    'date' => $prediction['date'],
+                    'match_id' => $prediction['match_id']
+                ]);
 
                 // Create or update the prediction with tips included
                 $savedPrediction = Prediction::updateOrCreate(
@@ -379,8 +379,14 @@ class AdibetScraper
                     ]
                 );
 
-                Log::info("Successfully saved prediction for match: {$prediction['match']} with " . count($prediction['tips']) . " tips");
-                $savedCount++;
+                if ($savedPrediction->wasRecentlyCreated) {
+                    Log::info("Created new prediction for match: {$prediction['match']}");
+                    $savedCount++;
+                } else {
+                    Log::info("Updated existing prediction for match: {$prediction['match']}");
+                    $savedCount++;
+                }
+
             } catch (\Exception $e) {
                 Log::error('Error saving prediction for match ' . ($prediction['match'] ?? 'unknown') . ': ' . $e->getMessage());
                 $errorCount++;

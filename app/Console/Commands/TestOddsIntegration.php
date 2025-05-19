@@ -44,36 +44,97 @@ class TestOddsIntegration extends Command
 
     public function handle()
     {
-        $this->info('Testing odds integration with a single match...');
+        $this->info('Testing odds integration with actual matches...');
 
         // Debug: Print API key and season
         $this->info("API Key: " . substr($this->apiKey, 0, 5) . '...');
         $this->info("Current Season: {$this->currentSeason}");
 
         // Get today's date in EAT
-        $today = Carbon::now($this->timezone)->format('Y-m-d');
-        $yesterday = Carbon::now($this->timezone)->subDay()->format('Y-m-d');
+        $today = Carbon::now($this->timezone);
+        $allowedStartDate = Carbon::parse('2025-05-18');
+        $allowedEndDate = Carbon::parse('2025-05-20');
+
+        // Check if today is within allowed range
+        if ($today->lt($allowedStartDate)) {
+            $this->info("Today's date is before allowed range, using start date: {$allowedStartDate->format('Y-m-d')}");
+            $testDate = $allowedStartDate->format('Y-m-d');
+        } elseif ($today->gt($allowedEndDate)) {
+            $this->info("Today's date is after allowed range, using end date: {$allowedEndDate->format('Y-m-d')}");
+            $testDate = $allowedEndDate->format('Y-m-d');
+        } else {
+            $testDate = $today->format('Y-m-d');
+        }
         
-        $this->info("Current date in {$this->timezone}: {$today}");
+        $this->info("Testing with date: {$testDate}");
         $this->info("Using season: {$this->currentSeason}/" . ($this->currentSeason + 1));
 
-        // Try to get a fixture for today
-        $this->info("\nTrying to find matches for today ({$today})...");
-        $fixture = $this->getSingleFixture($today);
+        // Get actual matches from database
+        $this->info("\nFetching actual matches from database...");
+        $matches = \App\Models\Prediction::whereDate('date', $testDate)->get();
         
-        // If no fixture today, try yesterday
-        if (empty($fixture)) {
-            $this->info("\nNo matches found for today, trying yesterday ({$yesterday})...");
-            $fixture = $this->getSingleFixture($yesterday);
-        }
-
-        if (empty($fixture)) {
-            $this->error('No matches found for today or yesterday');
+        if ($matches->isEmpty()) {
+            $this->error('No matches found in database for ' . $testDate);
             return;
         }
 
-        // Analyze the fixture
-        $this->analyzeFixture($fixture);
+        // Test each match
+        foreach ($matches as $match) {
+            $this->info("\nTesting match: {$match->match}");
+            
+            // Try API-FOOTBALL first
+            $fixture = $this->getSingleFixture($testDate);
+            
+            if (empty($fixture)) {
+                $this->info("No fixture found from API-FOOTBALL, trying OddsAPI...");
+                
+                // Try OddsAPI with actual match
+                $odds = $this->fetchOddsFromOddsAPI([
+                    'teams' => [
+                        'home' => ['name' => explode(' vs ', $match->match)[0]],
+                        'away' => ['name' => explode(' vs ', $match->match)[1]]
+                    ]
+                ]);
+                
+                if (!empty($odds)) {
+                    $this->info("\nSuccessfully fetched odds from OddsAPI:");
+                    $this->line("Home Win: " . ($odds['1'] ?? 'N/A'));
+                    $this->line("Draw: " . ($odds['X'] ?? 'N/A'));
+                    $this->line("Away Win: " . ($odds['2'] ?? 'N/A'));
+                } else {
+                    $this->error('No odds found from OddsAPI');
+                }
+            } else {
+                // Analyze the fixture
+                $this->analyzeFixture($fixture);
+            }
+        }
+    }
+
+    protected function getActualMatches()
+    {
+        try {
+            // Get matches from predictions:show
+            $response = Http::get('http://localhost:8000/api/predictions/show');
+            
+            if (!$response->successful()) {
+                $this->error('Failed to fetch matches from predictions:show: ' . $response->status());
+                return [];
+            }
+
+            $data = $response->json();
+            
+            if (empty($data['matches'])) {
+                $this->error('No matches found in predictions:show response');
+                return [];
+            }
+
+            return $data['matches'];
+
+        } catch (\Exception $e) {
+            $this->error('Error fetching matches from predictions:show: ' . $e->getMessage());
+            return [];
+        }
     }
 
     protected function getSingleFixture($date)

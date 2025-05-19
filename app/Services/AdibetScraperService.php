@@ -9,66 +9,24 @@ use Illuminate\Support\Carbon;
 class AdibetScraperService
 {
     private $baseUrl = 'https://adibet.com';
-    private $puppeteer;
-
-    public function __construct()
-    {
-        $this->initPuppeteer();
-    }
-
-    /**
-     * Initialize Puppeteer browser
-     */
-    private function initPuppeteer()
-    {
-        try {
-            $this->puppeteer = new \Nesk\Puphpeteer\Puppeteer;
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Failed to initialize Puppeteer: ' . $e->getMessage());
-            return false;
-        }
-    }
 
     /**
      * Scrape matches from Adibet
      */
     public function scrapeMatches()
     {
-        if (!$this->puppeteer) {
-            return [];
-        }
-
         try {
-            $browser = $this->puppeteer->launch([
-                'headless' => true,
-                'args' => ['--no-sandbox']
-            ]);
-
-            $page = $browser->newPage();
+            // Get predictions page
+            $response = Http::get($this->baseUrl . '/predictions');
             
-            // Navigate to predictions page
-            $page->goto($this->baseUrl . '/predictions', ['waitUntil' => 'networkidle2']);
+            if (!$response->successful()) {
+                Log::error('Failed to fetch Adibet predictions page');
+                return [];
+            }
 
-            // Wait for matches table to load
-            $page->waitForSelector('.matches-table');
-
-            // Extract matches data
-            $matches = $page->evaluate(JsFunction::createWithBody("
-                return Array.from(document.querySelectorAll('.match-row')).map(row => {
-                    const dateCell = row.querySelector('.date-cell');
-                    const matchCell = row.querySelector('.match-cell');
-                    const tipsCell = row.querySelector('.tips-cell');
-                    
-                    return {
-                        date: dateCell ? dateCell.textContent.trim() : '',
-                        match: matchCell ? matchCell.textContent.trim() : '',
-                        tips: tipsCell ? tipsCell.textContent.trim().split(',') : []
-                    };
-                });
-            "));
-
-            $browser->close();
+            // Extract matches using regex
+            $html = $response->body();
+            $matches = $this->extractMatches($html);
 
             // Filter and process matches
             return $this->processMatches($matches);
@@ -77,6 +35,38 @@ class AdibetScraperService
             Log::error('Failed to scrape Adibet matches: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Extract matches from HTML
+     */
+    private function extractMatches($html)
+    {
+        $matches = [];
+        $pattern = '/<tr class="match-row">(.*?)<\/tr>/s';
+        
+        if (preg_match_all($pattern, $html, $rows)) {
+            foreach ($rows[1] as $row) {
+                // Extract date
+                preg_match('/<td class="date-cell">(.*?)<\/td>/s', $row, $date);
+                
+                // Extract match
+                preg_match('/<td class="match-cell">(.*?)<\/td>/s', $row, $match);
+                
+                // Extract tips
+                preg_match('/<td class="tips-cell">(.*?)<\/td>/s', $row, $tips);
+                
+                if ($date && $match && $tips) {
+                    $matches[] = [
+                        'date' => strip_tags($date[1]),
+                        'match' => strip_tags($match[1]),
+                        'tips' => array_map('trim', explode(',', strip_tags($tips[1])))
+                    ];
+                }
+            }
+        }
+
+        return $matches;
     }
 
     /**

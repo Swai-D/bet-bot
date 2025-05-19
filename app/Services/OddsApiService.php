@@ -8,44 +8,122 @@ use Illuminate\Support\Facades\Cache;
 
 class OddsApiService
 {
-    private $baseUrl = 'https://api.the-odds-api.com/v4';
-    private $apiKey;
+    protected $apiKey;
+    protected $baseUrl = 'https://api.the-odds-api.com/v4/sports/soccer/odds';
 
     public function __construct()
     {
         $this->apiKey = config('services.odds_api.key');
     }
 
-    /**
-     * Get odds for a specific match
-     */
-    public function getMatchOdds($homeTeam, $awayTeam)
+    public function getMatchOdds($match, $date, $option)
     {
         try {
-            // Try to get from cache first
-            $cacheKey = "odds_{$homeTeam}_{$awayTeam}";
-            if (Cache::has($cacheKey)) {
-                return Cache::get($cacheKey);
-            }
-
-            // Get all available matches
-            $matches = $this->getAvailableMatches();
+            // Cache key based on match and date
+            $cacheKey = 'odds_' . md5($match . $date);
             
-            // Find matching game
-            foreach ($matches as $match) {
-                if ($this->isMatchingGame($match, $homeTeam, $awayTeam)) {
-                    $odds = $this->extractOdds($match);
-                    Cache::put($cacheKey, $odds, now()->addMinutes(30));
-                    return $odds;
+            // Try to get from cache first
+            if (Cache::has($cacheKey)) {
+                $odds = Cache::get($cacheKey);
+                return $this->getOddsForOption($odds, $option);
+            }
+            
+            // If not in cache, fetch from API
+            $response = Http::get($this->baseUrl, [
+                'apiKey' => $this->apiKey,
+                'regions' => 'eu',
+                'markets' => 'h2h,totals',
+                'dateFormat' => 'iso',
+                'oddsFormat' => 'decimal'
+            ]);
+
+            if ($response->successful()) {
+            $matches = $response->json();
+            
+                // Find matching game
+                $game = $this->findMatchingGame($matches, $match, $date);
+                
+                if ($game) {
+                    // Cache the odds for 1 hour
+                    Cache::put($cacheKey, $game, 3600);
+                    
+                    return $this->getOddsForOption($game, $option);
                 }
             }
-
-            return null;
+            
+            return 'N/A';
 
         } catch (\Exception $e) {
-            Log::error('Failed to get match odds: ' . $e->getMessage());
-            return null;
+            Log::error('OddsAPI Error: ' . $e->getMessage(), [
+                'match' => $match,
+                'date' => $date,
+                'option' => $option
+            ]);
+            return 'N/A';
         }
+    }
+
+    protected function findMatchingGame($matches, $searchMatch, $searchDate)
+    {
+        foreach ($matches as $match) {
+            // Check if date matches
+            $matchDate = date('Y-m-d', strtotime($match['commence_time']));
+            $searchDate = date('Y-m-d', strtotime($searchDate));
+            
+            if ($matchDate !== $searchDate) {
+                continue;
+            }
+            
+            // Check if teams match
+            $homeTeam = strtolower($match['home_team']);
+            $awayTeam = strtolower($match['away_team']);
+            $searchMatch = strtolower($searchMatch);
+            
+            if (strpos($searchMatch, $homeTeam) !== false && strpos($searchMatch, $awayTeam) !== false) {
+                return $match;
+            }
+        }
+
+        return null;
+    }
+
+    protected function getOddsForOption($game, $option)
+    {
+        if (!$game || !isset($game['bookmakers'])) {
+            return 'N/A';
+        }
+        
+        // Get first bookmaker (usually most reliable)
+        $bookmaker = $game['bookmakers'][0] ?? null;
+        if (!$bookmaker || !isset($bookmaker['markets'])) {
+            return 'N/A';
+        }
+        
+        // Map our options to API markets
+        $marketMap = [
+            '1' => ['market' => 'h2h', 'index' => 0],
+            'X' => ['market' => 'h2h', 'index' => 1],
+            '2' => ['market' => 'h2h', 'index' => 2],
+            'GG' => ['market' => 'totals', 'index' => 0],
+            'NG' => ['market' => 'totals', 'index' => 1],
+            '+2.5' => ['market' => 'totals', 'index' => 0],
+            '-2.5' => ['market' => 'totals', 'index' => 1]
+        ];
+        
+        $mapping = $marketMap[$option] ?? null;
+        if (!$mapping) {
+            return 'N/A';
+        }
+        
+        // Find the market
+        foreach ($bookmaker['markets'] as $market) {
+            if ($market['key'] === $mapping['market']) {
+                $odds = $market['outcomes'][$mapping['index']]['price'] ?? null;
+                return $odds ? number_format($odds, 2) : 'N/A';
+            }
+        }
+        
+        return 'N/A';
     }
 
     /**
@@ -129,8 +207,8 @@ class OddsApiService
             foreach ($bookmakers as $bookmaker) {
                 $markets = $bookmaker['markets'] ?? [];
                 foreach ($markets as $market) {
-                    if ($market['key'] === 'h2h') {
-                        foreach ($market['outcomes'] as $outcome) {
+                if ($market['key'] === 'h2h') {
+                    foreach ($market['outcomes'] as $outcome) {
                             $odds[$outcome['name']] = $outcome['price'];
                         }
                     }

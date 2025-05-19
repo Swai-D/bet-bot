@@ -370,3 +370,133 @@ The bot is regularly updated with:
 - Bug fixes
 
 Stay tuned for more features!
+
+# Betting Bot Documentation
+
+## Settings Structure
+
+Betting Bot inatumia settings table ili kuhifadhi mipangilio ya kila user. Hapa ndio muundo wa settings:
+
+### 1. User Settings (`settings` table)
+Kila user ana settings zake mwenyewe:
+
+- `user_id` - ID ya user (inaunganisha na users table)
+- `min_odds` - Odds ya chini ya 2.00 (mipango ya chini ya odds haitachaguliwa)
+- `auto_select_count` - Idadi ya matches kuchagua moja kwa moja (default: 3)
+- `bet_amount` - Kiasi cha bet kwa kila match (default: 1000 TZS)
+- `selection_mode` - Mode ya kuchagua matches:
+  - `auto` - Bot itachagua matches moja kwa moja
+  - `manual` - User atachagua matches mwenyewe
+- `auto_run_scraper` - Kukimbia scraper moja kwa moja (true/false)
+- `scraper_time` - Wakati wa kukimbia scraper (default: 09:00)
+- `auto_place_bets` - Kuweka bets moja kwa moja (true/false)
+- `confidence_threshold` - Kiwango cha uaminifu wa predictions:
+  - `high` - Predictions zenye uaminifu mkubwa tu
+  - `medium` - Predictions za kati
+  - `low` - Predictions zote
+- `bet_types` - Aina za bets zinazoruhusiwa:
+  - `homeWin` - Timu ya nyumbani
+  - `draw` - Draw
+  - `awayWin` - Timu ya kigeni
+  - `over2_5` - Zaidi ya magoli 2.5
+- `enable_notifications` - Kuwezesha notifications (true/false)
+- `last_run` - Wakati wa mwisho scraper ilikimbia
+
+## UI Functionality
+
+### Dashboard
+Dashboard inaonyesha:
+1. **Welcome Panel**
+   - Tarehe ya leo
+   - Jina la user
+
+2. **Current Status**
+   - Idadi ya matches zilizochimbwa leo
+   - Idadi ya matches zilizochaguliwa
+   - Hali ya bot (ON/OFF)
+
+3. **Quick Actions**
+   - Run Scraper - Kukimbia scraper mara moja
+   - Place Bets - Kuweka bets
+   - Stop Bot - Kuzima bot
+
+4. **Predictions List**
+   - Orodha ya matches zote
+   - Tip za kila match
+   - Odds
+   - Status ya kuchaguliwa
+
+5. **Betting Control Panel**
+   - Minimum Odds - Weka odds ya chini
+   - Auto Select Matches - Weka idadi ya matches kuchagua
+   - Bet Amount - Weka kiasi cha bet
+   - Selection Mode - Chagua auto au manual
+
+6. **Bet Placement Summary**
+   - Orodha ya bets zilizochaguliwa
+   - Match
+   - Tip
+   - Odds
+   - Stake
+
+7. **Betting History**
+   - Tarehe
+   - Match
+   - Tip
+   - Outcome (W/L/P)
+   - Stake
+   - Win/Loss
+
+### Settings Page
+Settings page inaruhusu user kubadilisha mipangilio yote:
+1. **Automation Settings**
+   - Auto Run Scraper
+   - Scraper Time
+   - Auto Place Bets
+
+2. **Betting Strategy**
+   - Confidence Threshold
+   - Bet Types (Home Win, Draw, Away Win, Over 2.5)
+
+3. **Notification Settings**
+   - Enable Notifications
+
+## Jinsi ya Kufanya Kazi
+
+1. **Kuanzisha Bot**
+   - Weka settings zako kwenye Settings page
+   - Geuza bot ON kwenye Dashboard
+   - Bot itaanza kufanya kazi kulingana na settings zako
+
+2. **Auto Mode**
+   - Bot itachagua matches moja kwa moja
+   - Itaweka bets kwa matches zilizochaguliwa
+   - Itatumia confidence threshold yako
+
+3. **Manual Mode**
+   - Bot itachimbia matches tu
+   - Wewe utachagua matches
+   - Wewe utaweka bets
+
+4. **Notifications**
+   - Utapata taarifa kwa:
+     - Matches mpya
+     - Bets zilizowekwa
+     - Matokeo ya matches
+
+## Best Practices
+
+1. **Settings**
+   - Weka odds ya chini ya 2.00 au zaidi
+   - Chagua confidence threshold ya kati au ya juu
+   - Weka scraper time mapema (k.m. 09:00)
+
+2. **Betting**
+   - Usiweke bets nyingi mno kwa wakati mmoja
+   - Fuatilia betting history
+   - Badilisha strategy kama inahitajika
+
+3. **Automation**
+   - Hakikisha una internet nzuri
+   - Fuatilia bot mara kwa mara
+   - Zima bot kama unahitaji kurekebisha settings

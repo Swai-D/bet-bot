@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { ref, computed, watch, onMounted } from 'vue';
+import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import axios from 'axios';
 import PredictionsList from '@/Components/PredictionsList.vue';
@@ -56,11 +56,16 @@ const selectedBets = computed(() => {
 // Methods
 const toggleBot = async () => {
     try {
-        botStatus.value = !botStatus.value;
-        // TODO: Implement bot status update in backend
+        const response = await axios.post('/api/automation/toggle');
+        if (response.data.success) {
+            botStatus.value = response.data.status;
         console.log('Bot status toggled:', botStatus.value);
+        } else {
+            alert('Failed to toggle bot: ' + response.data.message);
+        }
     } catch (error) {
         console.error('Failed to toggle bot:', error);
+        alert('Failed to toggle bot. Please try again.');
     }
 };
 
@@ -88,10 +93,19 @@ const placeBets = async () => {
     }
 };
 
-const stopBot = () => {
+const stopBot = async () => {
+    try {
+        const response = await axios.post('/api/automation/stop');
+        if (response.data.success) {
     botStatus.value = false;
-    // TODO: Implement bot stop in backend
     console.log('Bot stopped');
+        } else {
+            alert('Failed to stop bot: ' + response.data.message);
+        }
+    } catch (error) {
+        console.error('Failed to stop bot:', error);
+        alert('Failed to stop bot. Please try again.');
+    }
 };
 
 const placeAllBets = async () => {
@@ -128,6 +142,18 @@ watch(settings, () => {
 const updatePredictions = (newPredictions) => {
     predictions.value = newPredictions;
 };
+
+// Add status check on mount
+onMounted(async () => {
+    try {
+        const response = await axios.get('/api/automation/status');
+        if (response.data.success) {
+            botStatus.value = response.data.bot_status;
+        }
+    } catch (error) {
+        console.error('Failed to fetch bot status:', error);
+    }
+});
 </script>
 
 <template>
@@ -135,7 +161,7 @@ const updatePredictions = (newPredictions) => {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-white leading-tight">Dashboard</h2>
+            <h2 class="font-semibold text-xl text-gray-300 leading-tight">Dashboard</h2>
         </template>
 
         <div class="py-12">

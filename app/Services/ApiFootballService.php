@@ -10,7 +10,7 @@ use Carbon\Carbon;
 class ApiFootballService
 {
     protected $apiKey;
-    protected $baseUrl = 'https://v3.football.api-sports.io';
+    protected $baseUrl = 'https://api-football-v1.p.rapidapi.com/v3';
     protected $timezone = 'Africa/Dar_es_Salaam'; // EAT timezone
     
     // Map our leagues to API leagues with proper team mappings
@@ -92,182 +92,148 @@ class ApiFootballService
         }
     }
 
-    /**
-     * Get odds for a specific match
-     */
-    public function getMatchOdds(string $match, string $date, string $league = 'england')
+    public function getMatchOdds($match, $date, $option)
     {
         try {
-            if (!isset($this->leagueMap[$league])) {
-                Log::error('Invalid league specified', ['league' => $league]);
-                return null;
-            }
-
-            $leagueInfo = $this->leagueMap[$league];
-            $apiLeague = $leagueInfo['api_league'];
-            $apiSeason = $leagueInfo['api_season'];
-
-            // Split match string into home and away teams
-            $teams = explode(' vs ', $match);
-            if (count($teams) !== 2) {
-                Log::error('Invalid match format', ['match' => $match]);
-                return null;
-            }
-
-            $homeTeam = trim($teams[0]);
-            $awayTeam = trim($teams[1]);
-
-            // Normalize team names using the mapping
-            $homeTeam = $leagueInfo['teams'][$homeTeam] ?? $homeTeam;
-            $awayTeam = $leagueInfo['teams'][$awayTeam] ?? $awayTeam;
-
-            // Convert date to EAT timezone
-            $dateObj = Carbon::parse($date)->setTimezone($this->timezone);
-            $formattedDate = $dateObj->format('Y-m-d');
-
-            // Log request details
-            Log::info('Fetching odds', [
-                'match' => $match,
-                'home_team' => $homeTeam,
-                'away_team' => $awayTeam,
-                'date' => $formattedDate,
-                'league' => $apiLeague,
-                'season' => $apiSeason
-            ]);
-
-            // First get fixtures for the date
-            $fixturesResponse = Http::withHeaders([
-                'x-rapidapi-key' => $this->apiKey,
-                'x-rapidapi-host' => 'v3.football.api-sports.io'
-            ])->get("{$this->baseUrl}/fixtures", [
-                'league' => $apiLeague,
-                'season' => $apiSeason,
-                'date' => $formattedDate
-            ]);
-
-            if (!$fixturesResponse->successful()) {
-                Log::error('Fixtures API request failed', [
-                    'status' => $fixturesResponse->status(),
-                    'response' => $fixturesResponse->json()
-                ]);
-                return null;
-            }
-
-            $fixtures = $fixturesResponse->json();
+            // Cache key based on match and date
+            $cacheKey = 'api_football_odds_' . md5($match . $date);
             
-            if (!isset($fixtures['response']) || empty($fixtures['response'])) {
-                Log::warning('No fixtures found', [
-                    'league' => $apiLeague,
-                    'date' => $formattedDate,
-                    'response' => $fixtures
-                ]);
-                return null;
+            // Try to get from cache first
+            if (Cache::has($cacheKey)) {
+                $odds = Cache::get($cacheKey);
+                return $this->getOddsForOption($odds, $option);
             }
-
-            // Find the specific match
-            $targetFixture = null;
-            foreach ($fixtures['response'] as $fixture) {
-                $fixtureHomeTeam = $fixture['teams']['home']['name'];
-                $fixtureAwayTeam = $fixture['teams']['away']['name'];
-
-                if ($this->isTeamMatch($fixtureHomeTeam, $homeTeam) && 
-                    $this->isTeamMatch($fixtureAwayTeam, $awayTeam)) {
-                    $targetFixture = $fixture;
-                    break;
-                }
-            }
-
-            if (!$targetFixture) {
-                Log::warning('Match not found', [
-                    'home' => $homeTeam,
-                    'away' => $awayTeam,
-                    'date' => $formattedDate
-                ]);
-                return null;
-            }
-
-            // Get odds for the specific fixture
-            $oddsResponse = Http::withHeaders([
-                'x-rapidapi-key' => $this->apiKey,
-                'x-rapidapi-host' => 'v3.football.api-sports.io'
-            ])->get("{$this->baseUrl}/odds", [
-                'fixture' => $targetFixture['fixture']['id'],
-                'bookmaker' => 8 // Bet365
+            
+            // If not in cache, fetch from API
+            $response = Http::withHeaders([
+                'x-rapidapi-host' => 'api-football-v1.p.rapidapi.com',
+                'x-rapidapi-key' => $this->apiKey
+            ])->get($this->baseUrl . '/fixtures', [
+                'date' => date('Y-m-d', strtotime($date)),
+                'league' => $this->getLeagueId($match),
+                'season' => date('Y')
             ]);
-
-            if (!$oddsResponse->successful()) {
-                Log::error('Odds API request failed', [
-                    'status' => $oddsResponse->status(),
-                    'response' => $oddsResponse->json()
-                ]);
-                return null;
-            }
-
-            $oddsData = $oddsResponse->json();
-
-            if (!isset($oddsData['response']) || empty($oddsData['response'])) {
-                Log::warning('No odds found', [
-                    'fixture' => $targetFixture['fixture']['id'],
-                    'response' => $oddsData
-                ]);
-                return null;
-            }
-
-            // Extract match odds from Bet365
-            $bet365Odds = null;
-            foreach ($oddsData['response'][0]['bookmakers'] as $bookmaker) {
-                if ($bookmaker['id'] === 8) { // Bet365
-                    foreach ($bookmaker['bets'] as $bet) {
-                        if ($bet['id'] === 1) { // Match Winner
-                            $bet365Odds = $bet['values'];
-                            break 2;
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                $fixtures = $data['response'] ?? [];
+                
+                // Find matching game
+                $game = $this->findMatchingGame($fixtures, $match);
+                
+                if ($game) {
+                    // Get odds for this fixture
+                    $oddsResponse = Http::withHeaders([
+                        'x-rapidapi-host' => 'api-football-v1.p.rapidapi.com',
+                        'x-rapidapi-key' => $this->apiKey
+                    ])->get($this->baseUrl . '/odds', [
+                        'fixture' => $game['fixture']['id']
+                    ]);
+                    
+                    if ($oddsResponse->successful()) {
+                        $oddsData = $oddsResponse->json();
+                        $odds = $oddsData['response'][0] ?? null;
+                        
+                        if ($odds) {
+                            // Cache the odds for 1 hour
+                            Cache::put($cacheKey, $odds, 3600);
+                            
+                            return $this->getOddsForOption($odds, $option);
                         }
                     }
                 }
             }
-
-            if (!$bet365Odds) {
-                Log::warning('No Bet365 odds found', [
-                    'fixture' => $targetFixture['fixture']['id'],
-                    'response' => $oddsData
-                ]);
-                return null;
-            }
-
-            // Format odds
-            $formattedOdds = [];
-            foreach ($bet365Odds as $odd) {
-                switch ($odd['value']) {
-                    case 'Home':
-                        $formattedOdds['1'] = floatval($odd['odd']);
-                        break;
-                    case 'Draw':
-                        $formattedOdds['X'] = floatval($odd['odd']);
-                        break;
-                    case 'Away':
-                        $formattedOdds['2'] = floatval($odd['odd']);
-                        break;
-                }
-            }
-
-            // Log the odds
-            Log::info('Odds found', [
-                'match' => $match,
-                'fixture_id' => $targetFixture['fixture']['id'],
-                'odds' => $formattedOdds
-            ]);
-
-            return $formattedOdds;
-
+            
+            return 'N/A';
+            
         } catch (\Exception $e) {
-            Log::error('Error fetching match odds', [
-                'error' => $e->getMessage(),
+            Log::error('API-Football Error: ' . $e->getMessage(), [
                 'match' => $match,
                 'date' => $date,
-                'league' => $league
+                'option' => $option
             ]);
-            return null;
+            return 'N/A';
         }
+    }
+
+    protected function findMatchingGame($fixtures, $searchMatch)
+    {
+        foreach ($fixtures as $fixture) {
+            $homeTeam = strtolower($fixture['teams']['home']['name']);
+            $awayTeam = strtolower($fixture['teams']['away']['name']);
+            $searchMatch = strtolower($searchMatch);
+            
+            if (strpos($searchMatch, $homeTeam) !== false && strpos($searchMatch, $awayTeam) !== false) {
+                return $fixture;
+            }
+        }
+        
+        return null;
+    }
+
+    protected function getOddsForOption($game, $option)
+    {
+        if (!$game || !isset($game['bookmakers'])) {
+            return 'N/A';
+        }
+        
+        // Get first bookmaker (usually most reliable)
+        $bookmaker = $game['bookmakers'][0] ?? null;
+        if (!$bookmaker || !isset($bookmaker['bets'])) {
+            return 'N/A';
+        }
+        
+        // Map our options to API markets
+        $marketMap = [
+            '1' => ['market' => 'Match Winner', 'value' => 'Home'],
+            'X' => ['market' => 'Match Winner', 'value' => 'Draw'],
+            '2' => ['market' => 'Match Winner', 'value' => 'Away'],
+            'GG' => ['market' => 'Both Teams Score', 'value' => 'Yes'],
+            'NG' => ['market' => 'Both Teams Score', 'value' => 'No'],
+            '+2.5' => ['market' => 'Total Goals', 'value' => 'Over 2.5'],
+            '-2.5' => ['market' => 'Total Goals', 'value' => 'Under 2.5']
+        ];
+        
+        $mapping = $marketMap[$option] ?? null;
+        if (!$mapping) {
+            return 'N/A';
+        }
+        
+        // Find the market
+        foreach ($bookmaker['bets'] as $bet) {
+            if ($bet['name'] === $mapping['market']) {
+                foreach ($bet['values'] as $value) {
+                    if ($value['value'] === $mapping['value']) {
+                        return number_format($value['odd'], 2);
+                    }
+                }
+            }
+        }
+        
+        return 'N/A';
+    }
+
+    protected function getLeagueId($match)
+    {
+        // Map common leagues to their API-Football IDs
+        $leagueMap = [
+            'Premier League' => 39,
+            'La Liga' => 140,
+            'Serie A' => 135,
+            'Bundesliga' => 78,
+            'Ligue 1' => 61,
+            'Eredivisie' => 88,
+            'Primeira Liga' => 94,
+            'Super Lig' => 203
+        ];
+        
+        foreach ($leagueMap as $league => $id) {
+            if (stripos($match, $league) !== false) {
+                return $id;
+            }
+        }
+        
+        return null;
     }
 
     /**

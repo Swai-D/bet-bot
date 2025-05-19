@@ -30,8 +30,104 @@
                 </div>
               </div>
 
+              <!-- Betting Strategy Section -->
+              <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                <h2 class="text-lg font-semibold mb-4">Betting Strategy</h2>
+                <div class="space-y-4">
+                  <!-- Odds Range -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700">Min Odds</label>
+                      <input 
+                        type="number" 
+                        v-model="strategy.minOdds"
+                        step="0.1"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700">Max Odds</label>
+                      <input 
+                        type="number" 
+                        v-model="strategy.maxOdds"
+                        step="0.1"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      >
+                    </div>
+                  </div>
+
+                  <!-- Base Stake -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Base Stake (TZS)</label>
+                    <input 
+                      type="number" 
+                      v-model="strategy.baseStake"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
+                  </div>
+
+                  <!-- Confidence Threshold -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Confidence Threshold</label>
+                    <select 
+                      v-model="strategy.confidenceThreshold"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
+                      <option value="high">High Only</option>
+                      <option value="medium">Medium and Above</option>
+                      <option value="low">All Predictions</option>
+                    </select>
+                  </div>
+
+                  <!-- Bet Types -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Bet Types</label>
+                    <div class="grid grid-cols-2 gap-2">
+                      <label class="flex items-center">
+                        <input 
+                          type="checkbox" 
+                          v-model="strategy.betTypes.homeWin"
+                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        >
+                        <span class="ml-2 text-sm text-gray-700">Home Win (1)</span>
+                      </label>
+                      <label class="flex items-center">
+                        <input 
+                          type="checkbox" 
+                          v-model="strategy.betTypes.draw"
+                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        >
+                        <span class="ml-2 text-sm text-gray-700">Draw (X)</span>
+                      </label>
+                      <label class="flex items-center">
+                        <input 
+                          type="checkbox" 
+                          v-model="strategy.betTypes.awayWin"
+                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        >
+                        <span class="ml-2 text-sm text-gray-700">Away Win (2)</span>
+                      </label>
+                      <label class="flex items-center">
+                        <input 
+                          type="checkbox" 
+                          v-model="strategy.betTypes.over2_5"
+                          class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        >
+                        <span class="ml-2 text-sm text-gray-700">Over 2.5</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Control Section -->
               <div class="space-y-4">
+                <button
+                  @click="saveStrategy"
+                  class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Save Strategy
+                </button>
                 <button
                   @click="startAutomation"
                   :disabled="isRunning"
@@ -96,6 +192,18 @@ export default {
         remaining_requests: 0,
         last_run: null
       },
+      strategy: {
+        minOdds: 1.5,
+        maxOdds: 3.0,
+        baseStake: 1000,
+        confidenceThreshold: 'medium',
+        betTypes: {
+          homeWin: true,
+          draw: true,
+          awayWin: true,
+          over2_5: true
+        }
+      },
       results: [],
       isRunning: false,
       error: null
@@ -103,6 +211,7 @@ export default {
   },
   mounted() {
     this.fetchStatus();
+    this.fetchStrategy();
   },
   methods: {
     async fetchStatus() {
@@ -112,6 +221,23 @@ export default {
       } catch (error) {
         this.error = 'Failed to fetch status';
         console.error('Status fetch error:', error);
+      }
+    },
+    async fetchStrategy() {
+      try {
+        const response = await axios.get('/api/betting/strategy');
+        this.strategy = response.data.strategy;
+      } catch (error) {
+        console.error('Strategy fetch error:', error);
+      }
+    },
+    async saveStrategy() {
+      try {
+        await axios.post('/api/betting/strategy', this.strategy);
+        this.error = null;
+      } catch (error) {
+        this.error = 'Failed to save strategy';
+        console.error('Strategy save error:', error);
       }
     },
     async startAutomation() {

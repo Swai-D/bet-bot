@@ -95,22 +95,26 @@ class SavePredictions extends Command
                 // Calculate score based on league tier and tips
                 $score = $this->calculateScore($prediction);
                 
-                // Format tips to only include selected tips
+                // Format tips to include odds and status
                 $tips = collect($prediction['tips'] ?? [])
                     ->filter(function ($tip) {
                         // Only keep tips that are selected/highlighted
                         return is_array($tip) ? ($tip['selected'] ?? false) : false;
                     })
-                    ->map(function ($tip) {
+                    ->map(function ($tip) use ($prediction) {
                         // Extract just the option without odds
                         $option = $tip['option'] ?? $tip;
                         
                         // Validate and format the tip option
                         $option = $this->formatTipOption($option);
                         
+                        // Get odds from OddsAPI/APIFootballService
+                        $odds = $this->getOddsForTip($option, $prediction['match'], $prediction['date']);
+                        
                         return [
                             'option' => $option,
-                            'selected' => true
+                            'odd' => $odds,
+                            'status' => 'not selected' // Default status
                         ];
                     })
                     ->values()
@@ -226,6 +230,38 @@ class SavePredictions extends Command
         }
 
         return $score;
+    }
+
+    protected function getOddsForTip($option, $match, $date)
+    {
+        try {
+            // Try to get odds from OddsAPI first
+            $oddsApiService = app(\App\Services\OddsApiService::class);
+            $odds = $oddsApiService->getMatchOdds($match, $date, $option);
+            
+            if (!empty($odds)) {
+                return $odds;
+            }
+            
+            // If OddsAPI fails, try APIFootballService
+            $apiFootballService = app(\App\Services\ApiFootballService::class);
+            $odds = $apiFootballService->getMatchOdds($match, $date, $option);
+            
+            if (!empty($odds)) {
+                return $odds;
+            }
+            
+            // If both fail, return N/A
+            return 'N/A';
+            
+        } catch (\Exception $e) {
+            Log::error('Error fetching odds: ' . $e->getMessage(), [
+                'match' => $match,
+                'date' => $date,
+                'option' => $option
+            ]);
+            return 'N/A';
+        }
     }
 
     protected function showHeader()

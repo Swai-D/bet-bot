@@ -8,6 +8,7 @@ use App\Services\OddsApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Setting;
 
 class AutomationController extends Controller
 {
@@ -197,14 +198,108 @@ class AutomationController extends Controller
     }
 
     /**
+     * Toggle bot status
+     */
+    public function toggle()
+    {
+        try {
+            $currentStatus = Cache::get('bot_status', false);
+            $newStatus = !$currentStatus;
+            
+            Cache::put('bot_status', $newStatus, now()->addDay());
+            
+            if ($newStatus) {
+                // Start automation process
+                $this->start(new Request());
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => $newStatus,
+                'message' => $newStatus ? 'Bot started' : 'Bot stopped'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to toggle bot: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to toggle bot: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Stop the bot
+     */
+    public function stop()
+    {
+        try {
+            Cache::put('bot_status', false, now()->addDay());
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Bot stopped successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to stop bot: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to stop bot: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get automation status
      */
     public function status()
     {
         return response()->json([
-            'session_valid' => $this->betPawaService->isSessionValid(),
-            'remaining_requests' => $this->oddsApiService->getRemainingRequests(),
-            'last_run' => Cache::get('last_automation_run')
+            'session_valid' => true, // TODO: Implement actual session validation
+            'remaining_requests' => 100, // TODO: Implement actual request counting
+            'last_run' => Setting::first()?->last_run ?? null
         ]);
+    }
+
+    public function getStrategy()
+    {
+        $settings = Setting::first() ?? new Setting();
+        return response()->json([
+            'strategy' => [
+                'minOdds' => $settings->min_odds ?? 1.5,
+                'maxOdds' => 3.0,
+                'baseStake' => $settings->bet_amount ?? 1000,
+                'confidenceThreshold' => 'medium',
+                'betTypes' => [
+                    'homeWin' => true,
+                    'draw' => true,
+                    'awayWin' => true,
+                    'over2_5' => true
+                ]
+            ]
+        ]);
+    }
+
+    public function saveStrategy(Request $request)
+    {
+        $validated = $request->validate([
+            'minOdds' => 'required|numeric|min:1.01|max:100',
+            'maxOdds' => 'required|numeric|min:1.01|max:100',
+            'baseStake' => 'required|integer|min:100|max:1000000',
+            'confidenceThreshold' => 'required|in:high,medium,low',
+            'betTypes' => 'required|array',
+            'betTypes.homeWin' => 'boolean',
+            'betTypes.draw' => 'boolean',
+            'betTypes.awayWin' => 'boolean',
+            'betTypes.over2_5' => 'boolean'
+        ]);
+
+        $settings = Setting::first() ?? new Setting();
+        $settings->min_odds = $validated['minOdds'];
+        $settings->bet_amount = $validated['baseStake'];
+        $settings->save();
+
+        return response()->json(['success' => true]);
     }
 } 

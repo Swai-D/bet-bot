@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BettingController;
 use App\Http\Controllers\PredictionController;
 use App\Http\Controllers\AutomationController;
+use App\Http\Controllers\BettingStrategyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,6 +21,11 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::prefix('betting')->group(function () {
     Route::get('/matches', [BettingController::class, 'getMatches']);
     Route::post('/place-bet', [BettingController::class, 'placeBet']);
+    Route::get('/strategy', [BettingStrategyController::class, 'getStrategy']);
+    Route::post('/strategy', [BettingStrategyController::class, 'updateStrategy']);
+    Route::get('/stats', [BettingStrategyController::class, 'getStats']);
+    Route::post('/automation/start', [BettingStrategyController::class, 'startAutomation']);
+    Route::post('/automation/stop', [BettingStrategyController::class, 'stopAutomation']);
 });
 
 // Predictions API Routes
@@ -32,4 +38,6 @@ Route::prefix('predictions')->group(function () {
 Route::prefix('automation')->group(function () {
     Route::post('/start', [AutomationController::class, 'start']);
     Route::get('/status', [AutomationController::class, 'status']);
+    Route::post('/toggle', [AutomationController::class, 'toggle']);
+    Route::post('/stop', [AutomationController::class, 'stop']);
 }); 

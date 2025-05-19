@@ -22,6 +22,57 @@
             </button>
         </div>
 
+        <!-- Betting Control Panel -->
+        <div class="bg-gray-700 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-white mb-4">Betting Control Panel</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Minimum Odds</label>
+                    <input 
+                        type="number" 
+                        v-model="settings.minOdds"
+                        step="0.1"
+                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Auto Select Matches</label>
+                    <input 
+                        type="number" 
+                        v-model="settings.autoSelectCount"
+                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Bet Amount (TZS)</label>
+                    <input 
+                        type="number" 
+                        v-model="settings.betAmount"
+                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Selection Mode</label>
+                    <select 
+                        v-model="settings.selectionMode"
+                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                    >
+                        <option value="auto">Auto</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-4">
+                <button 
+                    @click="saveSettings"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                    :disabled="isSaving"
+                >
+                    {{ isSaving ? 'Saving...' : 'Save Settings' }}
+                </button>
+            </div>
+        </div>
+
         <!-- Loading Overlay -->
         <div v-if="isLoading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div class="bg-gray-800 p-6 rounded-lg shadow-xl text-center">
@@ -59,7 +110,15 @@ import axios from 'axios';
 
 const predictions = ref([]);
 const isLoading = ref(false);
+const isSaving = ref(false);
 const showSuccess = ref(false);
+
+const settings = ref({
+    minOdds: 2.00,
+    autoSelectCount: 3,
+    betAmount: 1000,
+    selectionMode: 'auto'
+});
 
 const fetchPredictions = async () => {
     try {
@@ -69,6 +128,35 @@ const fetchPredictions = async () => {
         }
     } catch (error) {
         console.error('Failed to fetch predictions:', error);
+    }
+};
+
+const fetchSettings = async () => {
+    try {
+        const response = await axios.get('/api/settings');
+        if (response.data.success) {
+            settings.value = response.data.settings;
+        }
+    } catch (error) {
+        console.error('Failed to fetch settings:', error);
+    }
+};
+
+const saveSettings = async () => {
+    isSaving.value = true;
+    try {
+        const response = await axios.post('/api/settings', settings.value);
+        if (response.data.success) {
+            showSuccess.value = true;
+            setTimeout(() => {
+                showSuccess.value = false;
+            }, 3000);
+        }
+    } catch (error) {
+        console.error('Failed to save settings:', error);
+        alert('Failed to save settings. Please try again.');
+    } finally {
+        isSaving.value = false;
     }
 };
 
@@ -89,7 +177,6 @@ const runScraper = async () => {
         }
     } catch (error) {
         console.error('Failed to run scraper:', error);
-        // Show error message to user
         alert(error.response?.data?.message || error.message || 'Failed to run scraper. Please try again.');
     } finally {
         isLoading.value = false;
@@ -102,5 +189,6 @@ const updatePredictions = (updatedPredictions) => {
 
 onMounted(() => {
     fetchPredictions();
+    fetchSettings();
 });
 </script> 

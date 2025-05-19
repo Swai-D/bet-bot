@@ -3,7 +3,7 @@
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="font-semibold text-xl text-white leading-tight">Settings</h2>
+            <h2 class="font-semibold text-xl text-gray-300 leading-tight">Settings</h2>
         </template>
 
         <div class="py-12">
@@ -18,129 +18,134 @@
                     {{ errorMessage }}
                 </div>
 
+                <form @submit.prevent="saveSettings" class="space-y-6">
+                    <!-- Automation Settings -->
                 <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-white">
-                        <form @submit.prevent="saveSettings" class="space-y-6">
-                            <!-- Minimum Odds -->
-                            <div>
-                                <label for="min_odds" class="block text-sm font-medium text-gray-300">Minimum Odds</label>
-                                <input
-                                    type="number"
-                                    id="min_odds"
-                                    v-model="form.min_odds"
-                                    step="0.01"
-                                    min="1.01"
-                                    max="100"
-                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    :class="{ 'border-red-500': form.errors.min_odds }"
-                                />
-                                <p class="mt-1 text-sm text-gray-400">Minimum odds required for predictions (1.01 - 100)</p>
-                                <p v-if="form.errors.min_odds" class="mt-1 text-sm text-red-500">{{ form.errors.min_odds }}</p>
-                            </div>
-
-                            <!-- Auto Select Count -->
-                            <div>
-                                <label for="auto_select_count" class="block text-sm font-medium text-gray-300">Auto Select Count</label>
-                                <input
-                                    type="number"
-                                    id="auto_select_count"
-                                    v-model="form.auto_select_count"
-                                    min="1"
-                                    max="10"
-                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    :class="{ 'border-red-500': form.errors.auto_select_count }"
-                                />
-                                <p class="mt-1 text-sm text-gray-400">Number of predictions to auto-select (1 - 10)</p>
-                                <p v-if="form.errors.auto_select_count" class="mt-1 text-sm text-red-500">{{ form.errors.auto_select_count }}</p>
-                            </div>
-
-                            <!-- Bet Amount -->
-                            <div>
-                                <label for="bet_amount" class="block text-sm font-medium text-gray-300">Bet Amount (TZS)</label>
-                                <input
-                                    type="number"
-                                    id="bet_amount"
-                                    v-model="form.bet_amount"
-                                    min="100"
-                                    max="1000000"
-                                    step="100"
-                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    :class="{ 'border-red-500': form.errors.bet_amount }"
-                                />
-                                <p class="mt-1 text-sm text-gray-400">Amount to bet per prediction (100 - 1,000,000 TZS)</p>
-                                <p v-if="form.errors.bet_amount" class="mt-1 text-sm text-red-500">{{ form.errors.bet_amount }}</p>
-                            </div>
-
-                            <!-- Selection Mode -->
-                            <div>
-                                <label for="selection_mode" class="block text-sm font-medium text-gray-300">Selection Mode</label>
-                                <select
-                                    id="selection_mode"
-                                    v-model="form.selection_mode"
-                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    :class="{ 'border-red-500': form.errors.selection_mode }"
-                                >
-                                    <option value="manual">Manual</option>
-                                    <option value="auto">Automatic</option>
-                                </select>
-                                <p class="mt-1 text-sm text-gray-400">How predictions should be selected</p>
-                                <p v-if="form.errors.selection_mode" class="mt-1 text-sm text-red-500">{{ form.errors.selection_mode }}</p>
-                            </div>
+                        <div class="p-6 text-gray-300">
+                            <h3 class="text-lg font-medium mb-4">Automation Settings</h3>
 
                             <!-- Auto Run Scraper -->
-                            <div>
+                            <div class="mb-4">
                                 <label class="flex items-center">
                                     <input
                                         type="checkbox"
                                         v-model="form.auto_run_scraper"
-                                        class="rounded border-gray-600 bg-gray-700 text-blue-500 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                     />
-                                    <span class="ml-2 text-sm text-gray-300">Auto Run Scraper</span>
+                                    <span class="ml-2">Auto Run Scraper</span>
                                 </label>
-                                <p class="mt-1 text-sm text-gray-400">Automatically run the scraper at scheduled time</p>
+                                <p class="mt-1 text-sm text-gray-400">Automatically run scraper at scheduled time</p>
                             </div>
 
                             <!-- Scraper Time -->
-                            <div v-if="form.auto_run_scraper">
+                            <div v-if="form.auto_run_scraper" class="mb-4">
                                 <label for="scraper_time" class="block text-sm font-medium text-gray-300">Scraper Time</label>
                                 <input
                                     type="time"
                                     id="scraper_time"
                                     v-model="form.scraper_time"
                                     class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    :class="{ 'border-red-500': form.errors.scraper_time }"
                                 />
-                                <p class="mt-1 text-sm text-gray-400">Time to run the scraper automatically</p>
-                                <p v-if="form.errors.scraper_time" class="mt-1 text-sm text-red-500">{{ form.errors.scraper_time }}</p>
+                                <p class="mt-1 text-sm text-gray-400">Time to run scraper automatically</p>
                             </div>
 
                             <!-- Auto Place Bets -->
-                            <div>
+                            <div class="mb-4">
                                 <label class="flex items-center">
                                     <input
                                         type="checkbox"
                                         v-model="form.auto_place_bets"
-                                        class="rounded border-gray-600 bg-gray-700 text-blue-500 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                     />
-                                    <span class="ml-2 text-sm text-gray-300">Auto Place Bets</span>
+                                    <span class="ml-2">Auto Place Bets</span>
                                 </label>
-                                <p class="mt-1 text-sm text-gray-400">Automatically place bets for selected predictions</p>
+                                <p class="mt-1 text-sm text-gray-400">Automatically place bets based on predictions</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Betting Strategy -->
+                    <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="p-6 text-gray-300">
+                            <h3 class="text-lg font-medium mb-4">Betting Strategy</h3>
+                            
+                            <!-- Confidence Threshold -->
+                            <div class="mb-4">
+                                <label for="confidence_threshold" class="block text-sm font-medium text-gray-300">Confidence Threshold</label>
+                                <select
+                                    id="confidence_threshold"
+                                    v-model="form.confidence_threshold"
+                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                >
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                                <p class="mt-1 text-sm text-gray-400">Minimum confidence level for predictions</p>
                             </div>
 
+                            <!-- Bet Types -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Bet Types</label>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            v-model="form.bet_types.homeWin"
+                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                        <span class="ml-2">Home Win</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            v-model="form.bet_types.draw"
+                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                        <span class="ml-2">Draw</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            v-model="form.bet_types.awayWin"
+                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                        <span class="ml-2">Away Win</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            v-model="form.bet_types.over2_5"
+                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        />
+                                        <span class="ml-2">Over 2.5 Goals</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notification Settings -->
+                    <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="p-6 text-gray-300">
+                            <h3 class="text-lg font-medium mb-4">Notification Settings</h3>
+
                             <!-- Enable Notifications -->
-                            <div>
+                            <div class="mb-4">
                                 <label class="flex items-center">
                                     <input
                                         type="checkbox"
                                         v-model="form.enable_notifications"
-                                        class="rounded border-gray-600 bg-gray-700 text-blue-500 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                     />
-                                    <span class="ml-2 text-sm text-gray-300">Enable Notifications</span>
+                                    <span class="ml-2">Enable Notifications</span>
                                 </label>
                                 <p class="mt-1 text-sm text-gray-400">Receive notifications for important events</p>
                             </div>
+                        </div>
+                            </div>
 
-                            <!-- Submit Button -->
+                    <!-- Save Button -->
                             <div class="flex justify-end">
                                 <button
                                     type="submit"
@@ -155,8 +160,6 @@
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
             </div>
         </div>
     </AuthenticatedLayout>
@@ -166,25 +169,52 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { ref, onMounted, watch } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
     settings: Object
 });
 
 const form = useForm({
-    min_odds: props.settings?.min_odds ?? 2.00,
-    auto_select_count: props.settings?.auto_select_count ?? 3,
-    bet_amount: props.settings?.bet_amount ?? 1000,
-    selection_mode: props.settings?.selection_mode ?? 'manual',
     auto_run_scraper: props.settings?.auto_run_scraper ?? false,
     scraper_time: props.settings?.scraper_time ?? '09:00',
     auto_place_bets: props.settings?.auto_place_bets ?? false,
+    confidence_threshold: props.settings?.confidence_threshold ?? 'medium',
+    bet_types: {
+        homeWin: props.settings?.bet_types?.homeWin ?? true,
+        draw: props.settings?.bet_types?.draw ?? true,
+        awayWin: props.settings?.bet_types?.awayWin ?? true,
+        over2_5: props.settings?.bet_types?.over2_5 ?? true
+    },
     enable_notifications: props.settings?.enable_notifications ?? false
 });
 
 const showSuccess = ref(false);
 const showError = ref(false);
 const errorMessage = ref('');
+
+const status = ref({
+    session_valid: false,
+    remaining_requests: 0,
+    last_run: null
+});
+
+const strategy = ref({
+    minOdds: 1.5,
+    maxOdds: 3.0,
+    baseStake: 1000,
+    confidenceThreshold: 'medium',
+    betTypes: {
+        homeWin: true,
+        draw: true,
+        awayWin: true,
+        over2_5: true
+    }
+});
+
+const results = ref([]);
+const isRunning = ref(false);
+const error = ref(null);
 
 // Reset scraper time when auto_run_scraper is disabled
 watch(() => form.auto_run_scraper, (newValue) => {
@@ -195,18 +225,6 @@ watch(() => form.auto_run_scraper, (newValue) => {
 
 const validateForm = () => {
     const errors = [];
-
-    if (form.min_odds < 1.01 || form.min_odds > 100) {
-        errors.push('Minimum odds must be between 1.01 and 100');
-    }
-
-    if (form.auto_select_count < 1 || form.auto_select_count > 10) {
-        errors.push('Auto select count must be between 1 and 10');
-    }
-
-    if (form.bet_amount < 100 || form.bet_amount > 1000000) {
-        errors.push('Bet amount must be between 100 and 1,000,000 TZS');
-    }
 
     if (form.auto_run_scraper && !form.scraper_time) {
         errors.push('Scraper time is required when auto run scraper is enabled');
@@ -244,5 +262,60 @@ const saveSettings = () => {
             }, 3000);
         }
     });
+};
+
+onMounted(() => {
+    fetchStatus();
+    fetchStrategy();
+});
+
+const fetchStatus = async () => {
+    try {
+        const response = await axios.get('/api/automation/status');
+        status.value = response.data;
+    } catch (error) {
+        error.value = 'Failed to fetch status';
+        console.error('Status fetch error:', error);
+    }
+};
+
+const fetchStrategy = async () => {
+    try {
+        const response = await axios.get('/api/betting/strategy');
+        strategy.value = response.data.strategy;
+    } catch (error) {
+        console.error('Strategy fetch error:', error);
+    }
+};
+
+const saveStrategy = async () => {
+    try {
+        await axios.post('/api/betting/strategy', strategy.value);
+        error.value = null;
+    } catch (error) {
+        error.value = 'Failed to save strategy';
+        console.error('Strategy save error:', error);
+    }
+};
+
+const startAutomation = async () => {
+    isRunning.value = true;
+    error.value = null;
+    results.value = [];
+
+    try {
+        const response = await axios.post('/api/automation/start');
+        if (response.data.success) {
+            results.value = response.data.results;
+        } else {
+            error.value = response.data.message;
+        }
+    } catch (error) {
+        error.value = error.response?.data?.message || 'Failed to start automation';
+        console.error('Automation error:', error);
+    } finally {
+        isRunning.value = false;
+        fetchStatus();
+    }
 };
 </script> 

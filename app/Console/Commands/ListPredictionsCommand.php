@@ -54,7 +54,7 @@ class ListPredictionsCommand extends Command
                 return Command::SUCCESS;
             }
             
-            $headers = ['ID', 'Match', 'Country', 'League', 'Date', 'Tips'];
+            $headers = ['ID', 'Match', 'Country', 'League', 'Date', 'Tips (Odds/Status)'];
             
             $rows = $predictions->map(function ($prediction) {
                 return [
@@ -64,7 +64,7 @@ class ListPredictionsCommand extends Command
                     $prediction->league,
                     $prediction->date,
                     collect($prediction->tips)->map(function ($tip) {
-                        return $tip['option'] . ' (' . $tip['odd'] . ')';
+                        return $tip['option'] . ' (' . $tip['odd'] . '/' . $tip['status'] . ')';
                     })->join(', '),
                 ];
             })->toArray();

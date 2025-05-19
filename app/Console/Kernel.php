@@ -12,10 +12,16 @@ class Kernel extends ConsoleKernel
         Commands\CleanupPredictionsCommand::class,
     ];
 
-    protected function schedule(Schedule $schedule)
+    /**
+     * Define the application's command schedule.
+     */
+    protected function schedule(Schedule $schedule): void
     {
-        // Run betting bot every 5 minutes
-        $schedule->command('betting:run')->everyFiveMinutes();
+        // Run scraper every minute to check scheduled time
+        $schedule->command('scraper:auto')->everyMinute();
+
+        // Run betting every 5 minutes
+        $schedule->command('betting:auto')->everyFiveMinutes();
 
         // Save predictions every 30 minutes
         $schedule->command('predictions:save')
@@ -35,7 +41,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('predictions:cleanup')->weekly();
     }
 
-    protected function commands()
+    /**
+     * Register the commands for the application.
+     */
+    protected function commands(): void
     {
         $this->load(__DIR__.'/Commands');
 

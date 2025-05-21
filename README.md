@@ -1,6 +1,4 @@
 
-
-````markdown
 # ⚽ BetPawa Automation Bot
 
 A professional betting automation system that integrates with **BetPawa**, **Adibet**, and **Odds API** to provide automated betting capabilities.
@@ -271,5 +269,4 @@ This bot is for **educational purposes** only. Use at your own risk. The develop
 * Improved scoring logic
 * Enhanced automation rules
 
-```
 

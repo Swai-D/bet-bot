@@ -33,9 +33,18 @@ class ProfileController extends Controller
         $user = $request->user();
         $oldAvatar = $user->avatar;
 
-        $user->fill($request->validated());
+        // Debug information
+        \Log::info('Profile Update Request', [
+            'all_data' => $request->all(),
+            'has_file' => $request->hasFile('avatar'),
+            'file_info' => $request->file('avatar') ? [
+                'name' => $request->file('avatar')->getClientOriginalName(),
+                'size' => $request->file('avatar')->getSize(),
+                'mime' => $request->file('avatar')->getMimeType(),
+            ] : null
+        ]);
 
-        // dd($request->all(), $request->file('avatar'));
+        $user->fill($request->validated());
 
         // Handle avatar upload
         if ($request->hasFile('avatar')) {

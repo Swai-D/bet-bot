@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\AdibetScraperService;
-use App\Services\OddsApiService;
+use App\Services\OddsPortalScraper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
@@ -14,15 +14,15 @@ class AutoScraperCommand extends Command
     protected $description = 'Run automatic scraping based on schedule';
 
     private $adibetScraper;
-    private $oddsApiService;
+    private $oddsPortalScraper;
 
     public function __construct(
         AdibetScraperService $adibetScraper,
-        OddsApiService $oddsApiService
+        OddsPortalScraper $oddsPortalScraper
     ) {
         parent::__construct();
         $this->adibetScraper = $adibetScraper;
-        $this->oddsApiService = $oddsApiService;
+        $this->oddsPortalScraper = $oddsPortalScraper;
     }
 
     public function handle()
@@ -56,9 +56,9 @@ class AutoScraperCommand extends Command
             // Process matches
             foreach ($matches as $match) {
                 // Get odds
-                $odds = $this->oddsApiService->getMatchOdds(
-                    $match['home_team'],
-                    $match['away_team']
+                $odds = $this->oddsPortalScraper->getOdds(
+                    $match['home_team'] . ' vs ' . $match['away_team'],
+                    '1X2'
                 );
 
                 // Calculate match score

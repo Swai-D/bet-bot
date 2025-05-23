@@ -1,0 +1,12 @@
+{
+  "name": "flashscore-scraper",
+  "version": "1.0.0",
+  "description": "Flashscore odds scraper for betting bot",
+  "main": "flashscore-scraper.js",
+  "scripts": {
+    "start": "node flashscore-scraper.js"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  }
+} 

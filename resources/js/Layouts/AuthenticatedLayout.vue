@@ -6,14 +6,15 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import { Link } from '@inertiajs/vue3';
+import ThemeSwitcher from '@/Components/ThemeSwitcher.vue';
 
 const showingNavigationDropdown = ref(false);
 </script>
 
 <template>
     <div>
-        <div class="min-h-screen bg-gradient-to-b from-gray-900 to-black">
-            <nav class="border-b border-gray-800 bg-gray-900">
+        <div class="min-h-screen bg-gradient-to-b from-gray-900 to-black dark:from-dark-bg dark:to-black">
+            <nav class="border-b border-gray-800 bg-gray-900 dark:bg-dark-bg">
                 <!-- Primary Navigation Menu -->
                 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div class="flex h-16 justify-between">
@@ -22,7 +23,7 @@ const showingNavigationDropdown = ref(false);
                             <div class="flex shrink-0 items-center">
                                 <Link :href="route('dashboard')">
                                     <ApplicationLogo
-                                        class="block h-9 w-auto fill-current text-blue-500"
+                                        class="block h-9 w-auto fill-current text-primary"
                                     />
                                 </Link>
                             </div>
@@ -82,6 +83,11 @@ const showingNavigationDropdown = ref(false);
                                         </DropdownLink>
                                     </template>
                                 </Dropdown>
+                            </div>
+
+                            <!-- Theme Switcher -->
+                            <div class="ms-3 relative">
+                                <ThemeSwitcher />
                             </div>
                         </div>
 
@@ -164,7 +170,7 @@ const showingNavigationDropdown = ref(false);
 
             <!-- Page Heading -->
             <header
-                class="bg-gray-900 shadow"
+                class="bg-gray-900 dark:bg-dark-bg shadow"
                 v-if="$slots.header"
             >
                 <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">

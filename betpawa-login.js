@@ -26,7 +26,7 @@ const setupLogging = () => {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const logFile = fs.createWriteStream(path.join(logDir, `betpawa-bot-${today}.log`), { flags: 'a' });
+    const logFile = fs.createWriteStream(path.join(logDir, `betpawa-login-${today}.log`), { flags: 'a' });
 
     // Cleanup old logs (older than 7 days)
     const cleanupOldLogs = () => {
@@ -83,7 +83,7 @@ const takeScreenshot = async (page, name) => {
     return screenshotPath;
 };
 
-export async function checkBetpawaBalance() {
+export async function loginToBetpawa() {
     log('Starting Betpawa login process...');
     let browser;
     try {
@@ -178,10 +178,10 @@ export async function checkBetpawaBalance() {
 if (import.meta.url === `file://${process.argv[1]}`) {
     if (process.argv.length < 3) {
         console.log(`
-Usage: node betpawa-bot.js [command]
+Usage: node betpawa-login.js [command]
 
 Commands:
-  balance    Check current balance
+  login      Login to Betpawa and check balance
   help       Show this help message
         `);
         process.exit(0);
@@ -189,8 +189,8 @@ Commands:
 
     const command = process.argv[2];
     switch (command) {
-        case 'balance':
-            checkBetpawaBalance()
+        case 'login':
+            loginToBetpawa()
                 .then(result => console.log(JSON.stringify(result, null, 2)))
                 .catch(error => {
                     console.error('Error:', error);

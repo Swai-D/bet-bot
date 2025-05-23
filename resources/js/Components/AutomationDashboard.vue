@@ -1,4 +1,130 @@
 <template>
+  <div class="card">
+    <!-- Header -->
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-light-text dark:text-dark-text mb-2">Automation Dashboard</h2>
+      <p class="text-secondary dark:text-secondary-light">Manage your automated betting strategies</p>
+    </div>
+
+    <!-- System Status -->
+    <div class="card mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold text-light-text dark:text-dark-text">System Status</h3>
+          <p class="text-secondary dark:text-secondary-light">Current automation status</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div :class="[
+            'w-3 h-3 rounded-full',
+            isRunning ? 'bg-accent' : 'bg-secondary'
+          ]"></div>
+          <span class="text-light-text dark:text-dark-text">
+            {{ isRunning ? 'Running' : 'Stopped' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strategy Settings -->
+    <div class="card mb-6">
+      <h3 class="text-lg font-semibold text-light-text dark:text-dark-text mb-4">Strategy Settings</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="label">Minimum Odds</label>
+          <input 
+            type="number" 
+            v-model="strategy.minOdds"
+            step="0.1"
+            class="input"
+          >
+        </div>
+        <div>
+          <label class="label">Maximum Odds</label>
+          <input 
+            type="number" 
+            v-model="strategy.maxOdds"
+            step="0.1"
+            class="input"
+          >
+        </div>
+        <div>
+          <label class="label">Bet Amount (TZS)</label>
+          <input 
+            type="number" 
+            v-model="strategy.betAmount"
+            class="input"
+          >
+        </div>
+        <div>
+          <label class="label">Selection Criteria</label>
+          <select 
+            v-model="strategy.selectionCriteria"
+            class="input"
+          >
+            <option value="highest_odds">Highest Odds</option>
+            <option value="lowest_odds">Lowest Odds</option>
+            <option value="random">Random</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4">
+        <button 
+          @click="saveStrategy"
+          class="btn-accent w-full"
+          :disabled="isSaving"
+        >
+          {{ isSaving ? 'Saving...' : 'Save Strategy' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Automation Control -->
+    <div class="card mb-6">
+      <h3 class="text-lg font-semibold text-light-text dark:text-dark-text mb-4">Automation Control</h3>
+      <div class="flex space-x-4">
+        <button 
+          @click="startAutomation"
+          class="btn-primary flex-1"
+          :disabled="isRunning"
+        >
+          Start Automation
+        </button>
+        <button 
+          @click="stopAutomation"
+          class="btn-secondary flex-1"
+          :disabled="!isRunning"
+        >
+          Stop Automation
+        </button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card">
+      <h3 class="text-lg font-semibold text-light-text dark:text-dark-text mb-4">Results</h3>
+      <div class="space-y-4">
+        <div class="flex justify-between items-center">
+          <span class="text-secondary dark:text-secondary-light">Total Bets</span>
+          <span class="text-light-text dark:text-dark-text">{{ results.totalBets }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-secondary dark:text-secondary-light">Wins</span>
+          <span class="text-accent">{{ results.wins }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-secondary dark:text-secondary-light">Losses</span>
+          <span class="text-secondary dark:text-secondary-light">{{ results.losses }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-secondary dark:text-secondary-light">Win Rate</span>
+          <span class="text-light-text dark:text-dark-text">{{ results.winRate }}%</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-secondary dark:text-secondary-light">Profit/Loss</span>
+          <span :class="[
+            'font-semibold',
+            results.profitLoss >= 0 ? 'text-accent' : 'text-secondary dark:text-secondary-light'
+          ]">
   <div class="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
     <div class="relative py-3 sm:max-w-xl sm:mx-auto">
       <div class="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">

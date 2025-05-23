@@ -6,6 +6,8 @@ use App\Models\Prediction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use App\Services\AdibetScraper;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PredictionController extends Controller
 {
@@ -79,6 +81,88 @@ class PredictionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to scrape predictions: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'match' => 'required|string',
+                'country' => 'required|string',
+                'league' => 'nullable|string',
+                'date' => 'required|date',
+                'tips' => 'required|array',
+                'odds' => 'nullable|array',
+                'raw_data' => 'nullable|array',
+                'source' => 'required|in:adibet,sportytrader'
+            ]);
+
+            // Generate unique match_id
+            $matchId = md5($data['match'] . $data['date']);
+
+            // Check if prediction already exists
+            $existingPrediction = Prediction::where('match_id', $matchId)->first();
+
+            if ($existingPrediction) {
+                // Update existing prediction
+                $existingPrediction->update([
+                    'match' => $data['match'],
+                    'country' => $data['country'],
+                    'league' => $data['league'] ?? 'Unknown League',
+                    'date' => $data['date'],
+                    'tips' => $data['tips'],
+                    'raw_data' => $data['raw_data'] ?? null
+                ]);
+
+                return response()->json([
+                    'message' => 'Prediction updated successfully',
+                    'prediction' => $existingPrediction
+                ]);
+            }
+
+            // Create new prediction
+            $prediction = Prediction::create([
+                'match_id' => $matchId,
+                'match' => $data['match'],
+                'country' => $data['country'],
+                'league' => $data['league'] ?? 'Unknown League',
+                'date' => $data['date'],
+                'tips' => $data['tips'],
+                'raw_data' => $data['raw_data'] ?? null
+            ]);
+
+            return response()->json([
+                'message' => 'Prediction created successfully',
+                'prediction' => $prediction
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error storing prediction: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to store prediction',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getLatestPredictions()
+    {
+        try {
+            $predictions = Prediction::where('date', '>=', now())
+                ->orderBy('date', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $predictions
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching predictions: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to fetch predictions',
+                'message' => $e->getMessage()
             ], 500);
         }
     }

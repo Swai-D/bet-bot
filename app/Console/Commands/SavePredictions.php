@@ -108,7 +108,7 @@ class SavePredictions extends Command
                         // Validate and format the tip option
                         $option = $this->formatTipOption($option);
                         
-                        // Get odds from OddsAPI/APIFootballService
+                        // Get odds from FlashscoreScraper
                         $odds = $this->getOddsForTip($option, $prediction['match'], $prediction['date']);
                         
                         return [
@@ -235,23 +235,15 @@ class SavePredictions extends Command
     protected function getOddsForTip($option, $match, $date)
     {
         try {
-            // Try to get odds from OddsAPI first
-            $oddsApiService = app(\App\Services\OddsApiService::class);
-            $odds = $oddsApiService->getMatchOdds($match, $date, $option);
+            // Use FlashscoreScraper instead of OddsAPI
+            $flashscoreScraper = app(\App\Services\FlashscoreScraper::class);
+            $odds = $flashscoreScraper->getMatchOdds($match, $option);
             
             if (!empty($odds)) {
                 return $odds;
             }
             
-            // If OddsAPI fails, try APIFootballService
-            $apiFootballService = app(\App\Services\ApiFootballService::class);
-            $odds = $apiFootballService->getMatchOdds($match, $date, $option);
-            
-            if (!empty($odds)) {
-                return $odds;
-            }
-            
-            // If both fail, return N/A
+            // If Flashscore fails, return N/A
             return 'N/A';
             
         } catch (\Exception $e) {

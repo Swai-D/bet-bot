@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\BetPawaService;
 use App\Services\AdibetScraperService;
-use App\Services\OddsApiService;
+use App\Services\OddsPortalScraper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -14,16 +14,16 @@ class AutomationController extends Controller
 {
     private $betPawaService;
     private $adibetScraper;
-    private $oddsApiService;
+    private $oddsPortalScraper;
 
     public function __construct(
         BetPawaService $betPawaService,
         AdibetScraperService $adibetScraper,
-        OddsApiService $oddsApiService
+        OddsPortalScraper $oddsPortalScraper
     ) {
         $this->betPawaService = $betPawaService;
         $this->adibetScraper = $adibetScraper;
-        $this->oddsApiService = $oddsApiService;
+        $this->oddsPortalScraper = $oddsPortalScraper;
     }
 
     /**
@@ -82,9 +82,9 @@ class AutomationController extends Controller
     {
         try {
             // Get odds for the match
-            $odds = $this->oddsApiService->getMatchOdds(
-                $match['home_team'],
-                $match['away_team']
+            $odds = $this->oddsPortalScraper->getOdds(
+                $match['home_team'] . ' vs ' . $match['away_team'],
+                '1X2'
             );
 
             if (!$odds) {
@@ -98,7 +98,7 @@ class AutomationController extends Controller
             $matchScore = $this->adibetScraper->calculateMatchScore($match);
 
             // Check if odds are favorable
-            if (!$this->oddsApiService->areOddsFavorable($odds)) {
+            if (!$this->oddsPortalScraper->areOddsFavorable($odds)) {
                 Log::info('Odds not favorable for match', [
                     'match' => $match['home_team'] . ' vs ' . $match['away_team'],
                     'odds' => $odds,

@@ -21,29 +21,22 @@ const user = usePage().props.auth.user;
 const form = useForm({
     name: user.name,
     email: user.email,
+    avatar: null
 });
 
 const preview = ref(user.avatar || '/images/default-avatar.png');
-const avatarFile = ref(null);
 
 function onFileChange(e) {
   const file = e.target.files[0];
   if (file) {
-    avatarFile.value = file;
+    form.avatar = file;
     preview.value = URL.createObjectURL(file);
   }
 }
 
 function submitForm() {
-  const data = new FormData();
-  data.append('name', form.name);
-  data.append('email', form.email);
-  if (avatarFile.value) {
-    data.append('avatar', avatarFile.value);
-  }
   form.post(route('profile.update'), {
-    data,
-    forceFormData: true,
+    preserveScroll: true,
     onSuccess: () => {
       Inertia.reload({ only: ['auth'] });
     },

@@ -1,16 +1,16 @@
 <template>
-    <div class="bg-gray-800 rounded-lg shadow-lg p-6">
+    <div class="card">
         <!-- Header -->
         <div class="mb-6">
-            <h2 class="text-2xl font-bold text-white mb-2">Betting Predictions</h2>
-            <p class="text-gray-300">View and filter your betting predictions</p>
+            <h2 class="text-2xl font-bold text-light-text dark:text-dark-text mb-2">Betting Predictions</h2>
+            <p class="text-secondary dark:text-secondary-light">View and filter your betting predictions</p>
         </div>
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <button 
                 @click="runScraper"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center space-x-2"
+                class="btn-primary flex items-center justify-center space-x-2"
                 :disabled="isLoading"
             >
                 <!-- Loading Spinner -->
@@ -23,39 +23,39 @@
         </div>
 
         <!-- Betting Control Panel -->
-        <div class="bg-gray-700 rounded-lg p-4 mb-6">
-            <h3 class="text-lg font-semibold text-white mb-4">Betting Control Panel</h3>
+        <div class="card mb-6">
+            <h3 class="text-lg font-semibold text-light-text dark:text-dark-text mb-4">Betting Control Panel</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Minimum Odds</label>
+                    <label class="label">Minimum Odds</label>
                     <input 
                         type="number" 
                         v-model="settings.minOdds"
                         step="0.1"
-                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                        class="input"
                     >
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Auto Select Matches</label>
+                    <label class="label">Auto Select Matches</label>
                     <input 
                         type="number" 
                         v-model="settings.autoSelectCount"
-                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                        class="input"
                     >
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Bet Amount (TZS)</label>
+                    <label class="label">Bet Amount (TZS)</label>
                     <input 
                         type="number" 
                         v-model="settings.betAmount"
-                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                        class="input"
                     >
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Selection Mode</label>
+                    <label class="label">Selection Mode</label>
                     <select 
                         v-model="settings.selectionMode"
-                        class="w-full rounded-md border-gray-600 bg-gray-800 text-white"
+                        class="input"
                     >
                         <option value="auto">Auto</option>
                         <option value="manual">Manual</option>
@@ -65,7 +65,7 @@
             <div class="mt-4">
                 <button 
                     @click="saveSettings"
-                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                    class="btn-accent w-full"
                     :disabled="isSaving"
                 >
                     {{ isSaving ? 'Saving...' : 'Save Settings' }}
@@ -75,13 +75,13 @@
 
         <!-- Loading Overlay -->
         <div v-if="isLoading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-gray-800 p-6 rounded-lg shadow-xl text-center">
-                <svg class="animate-spin h-12 w-12 text-blue-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <div class="card text-center">
+                <svg class="animate-spin h-12 w-12 text-primary mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="text-white text-lg">Fetching predictions...</p>
-                <p class="text-gray-400 text-sm mt-2">This may take a few moments</p>
+                <p class="text-light-text dark:text-dark-text text-lg">Fetching predictions...</p>
+                <p class="text-secondary dark:text-secondary-light text-sm mt-2">This may take a few moments</p>
             </div>
         </div>
 
@@ -94,7 +94,7 @@
         </div>
 
         <!-- Success Toast -->
-        <div v-if="showSuccess" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+        <div v-if="showSuccess" class="fixed bottom-4 right-4 bg-accent text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>

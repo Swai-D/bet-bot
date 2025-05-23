@@ -10,6 +10,7 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         Commands\BackupPredictionsCommand::class,
         Commands\CleanupPredictionsCommand::class,
+        \App\Console\Commands\InsertBetisValenciaPredictionCommand::class,
     ];
 
     /**

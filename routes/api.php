@@ -32,6 +32,8 @@ Route::prefix('betting')->group(function () {
 Route::prefix('predictions')->group(function () {
     Route::get('/', [PredictionController::class, 'index']);
     Route::post('/run-scraper', [PredictionController::class, 'runScraper']);
+    Route::post('/', [PredictionController::class, 'store']);
+    Route::get('/latest', [PredictionController::class, 'getLatestPredictions']);
 });
 
 // Betting Automation Routes

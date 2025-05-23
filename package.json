@@ -2,20 +2,23 @@
     "name": "betting-bot",
     "version": "1.0.0",
     "type": "module",
-    "description": "Automated betting bot for Adibet and Betpawa",
+    "description": "Betting bot with OddsPortal scraper",
     "main": "adibet-scraper.js",
     "scripts": {
         "scrape": "node adibet-scraper.js",
         "bet": "node betpawa-bot.js",
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "start": "node betpawa-login.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {
         "@inertiajs/inertia": "^0.11.1",
         "axios": "^1.9.0",
         "cheerio": "^1.0.0-rc.12",
-        "dotenv": "^16.4.5",
-        "playwright": "^1.52.0"
+        "dotenv": "^16.5.0",
+        "playwright": "^1.52.0",
+        "puppeteer": "^21.0.0"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^1.0.0",
@@ -25,7 +28,7 @@
         "laravel-vite-plugin": "^1.2.0",
         "postcss": "^8.4.35",
         "tailwindcss": "^3.4.1",
-        "vite": "^5.0.0",
+        "vite": "^6.3.5",
         "vue": "^3.4.15"
     }
 }

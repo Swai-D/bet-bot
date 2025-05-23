@@ -2,22 +2,45 @@
 
 namespace App\Services;
 
-use Spatie\Browsershot\Browsershot;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
 
 class BetpawaPlaywright
 {
-    protected $browser;
-    protected $page;
     protected $screenshotPath;
 
     public function __construct()
     {
-        $this->screenshotPath = storage_path('app/betpawa-screenshots');
+        // Create screenshots directory in public folder for easy access
+        $this->screenshotPath = str_replace('\\', '/', public_path('screenshots'));
+        
+        // Log the screenshot path
+        Log::info('Screenshot path: ' . $this->screenshotPath);
+        
         if (!file_exists($this->screenshotPath)) {
-            mkdir($this->screenshotPath, 0777, true);
+            Log::info('Creating screenshots directory...');
+            if (!mkdir($this->screenshotPath, 0777, true)) {
+                Log::error('Failed to create screenshots directory');
+                throw new \Exception('Failed to create screenshots directory');
+            }
+            Log::info('Screenshots directory created successfully');
         }
+        
+        // Test if directory is writable
+        if (!is_writable($this->screenshotPath)) {
+            Log::error('Screenshots directory is not writable');
+            throw new \Exception('Screenshots directory is not writable');
+        }
+        
+        // Create a test file to verify write permissions
+        $testFile = $this->screenshotPath . '/test.txt';
+        if (file_put_contents($testFile, 'test') === false) {
+            Log::error('Failed to write test file to screenshots directory');
+            throw new \Exception('Failed to write test file to screenshots directory');
+        }
+        unlink($testFile);
+        Log::info('Screenshots directory is writable');
     }
 
     public function login($username, $password)
@@ -25,49 +48,178 @@ class BetpawaPlaywright
         try {
             Log::info('Attempting to login to Betpawa...');
             
-            // Create a new browser instance
-            $browser = new Browsershot();
+            // Create a temporary JavaScript file for login
+            $scriptPath = storage_path('app/temp-login.js');
+            $script = <<<JS
+            import { chromium } from 'playwright';
+            import fs from 'fs';
+            import path from 'path';
             
-            // Set viewport and user agent
-            $browser->setScreenshotType('jpeg', 100)
-                   ->windowSize(1920, 1080)
-                   ->userAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-
-            // Navigate to login page
-            $browser->setUrl('https://www.betpawa.co.tz/login');
-            
-            // Take screenshot before login
-            $browser->save($this->screenshotPath . '/before-login.jpg');
-            
-            // Fill login form
-            $browser->evaluate("
-                document.querySelector('#login-form-phoneNumber').value = '{$username}';
-                document.querySelector('#login-form-password-input').value = '{$password}';
-                document.querySelector('input[data-test-id=\"logInButton\"]').click();
-            ");
-            
-            // Wait for login to complete
-            sleep(5);
-            
-            // Take screenshot after login
-            $browser->save($this->screenshotPath . '/after-login.jpg');
-            
-            // Check if login was successful
-            $isLoggedIn = $browser->evaluate("
-                document.querySelector('.button.balance') !== null
-            ");
-            
-            if ($isLoggedIn) {
-                Log::info('Login successful');
-                return true;
+            async function login() {
+                console.log('Starting login process...');
+                const browser = await chromium.launch({ 
+                    headless: false,
+                    slowMo: 100, // Add delay between actions
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+                try {
+                    console.log('Browser launched successfully');
+                    const context = await browser.newContext();
+                    const page = await context.newPage();
+                    
+                    console.log('Navigating to Betpawa...');
+                    // Navigate to Betpawa
+                    await page.goto('https://www.betpawa.co.tz', {
+                        waitUntil: 'networkidle',
+                        timeout: 30000
+                    });
+                    console.log('Navigation complete');
+                    
+                    // Take screenshot of homepage
+                    const screenshotPath = path.resolve('{$this->screenshotPath}/1-homepage.png');
+                    console.log('Taking homepage screenshot...');
+                    await page.screenshot({ path: screenshotPath });
+                    console.log('Screenshot saved to: ' + screenshotPath);
+                    
+                    // First check if already logged in
+                    console.log('Checking if already logged in...');
+                    const isAlreadyLoggedIn = await page.waitForSelector('.button.balance', { timeout: 5000 })
+                        .then(() => true)
+                        .catch(() => false);
+                    
+                    if (isAlreadyLoggedIn) {
+                        console.log('Already logged in, getting balance...');
+                        const balance = await page.textContent('.button.balance');
+                        const screenshotPath = path.resolve('{$this->screenshotPath}/2-already-logged-in.png');
+                        await page.screenshot({ path: screenshotPath });
+                        console.log('Screenshot saved to: ' + screenshotPath);
+                        console.log(JSON.stringify({ 
+                            success: true, 
+                            message: 'Already logged in',
+                            balance
+                        }));
+                        
+                        // Wait for 5 seconds before closing
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        return;
+                    }
+                    
+                    console.log('Not logged in, proceeding with login...');
+                    // If not logged in, proceed with login
+                    await page.click('a[href="/login"]');
+                    await page.waitForLoadState('networkidle');
+                    const screenshotPath = path.resolve('{$this->screenshotPath}/3-login-page.png');
+                    await page.screenshot({ path: screenshotPath });
+                    console.log('Screenshot saved to: ' + screenshotPath);
+                    
+                    // Fill login form
+                    console.log('Filling login form...');
+                    await page.fill('#login-form-phoneNumber', '{$username}');
+                    await page.fill('#login-form-password-input', '{$password}');
+                    const formScreenshotPath = path.resolve('{$this->screenshotPath}/4-filled-form.png');
+                    await page.screenshot({ path: formScreenshotPath });
+                    console.log('Screenshot saved to: ' + formScreenshotPath);
+                    
+                    // Click login submit button
+                    console.log('Clicking login button...');
+                    await page.click('input[data-test-id="logInButton"]');
+                    await page.waitForLoadState('networkidle');
+                    
+                    // Check if login was successful
+                    console.log('Checking login result...');
+                    const isLoggedIn = await page.waitForSelector('.button.balance', { timeout: 5000 })
+                        .then(() => true)
+                        .catch(() => false);
+                    
+                    if (isLoggedIn) {
+                        console.log('Login successful, getting balance...');
+                        const balance = await page.textContent('.button.balance');
+                        const screenshotPath = path.resolve('{$this->screenshotPath}/5-login-success.png');
+                        await page.screenshot({ path: screenshotPath });
+                        console.log('Screenshot saved to: ' + screenshotPath);
+                        console.log(JSON.stringify({ 
+                            success: true, 
+                            message: 'Login successful',
+                            balance 
+                        }));
+                    } else {
+                        console.log('Login failed...');
+                        const screenshotPath = path.resolve('{$this->screenshotPath}/5-login-failed.png');
+                        await page.screenshot({ path: screenshotPath });
+                        console.log('Screenshot saved to: ' + screenshotPath);
+                        console.log(JSON.stringify({ 
+                            success: false, 
+                            message: 'Login failed' 
+                        }));
+                    }
+                    
+                    // Wait for 5 seconds before closing
+                    console.log('Waiting 5 seconds before closing...');
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                } catch (error) {
+                    console.error('Error occurred:', error);
+                    const screenshotPath = path.resolve('{$this->screenshotPath}/error.png');
+                    await page.screenshot({ path: screenshotPath });
+                    console.log('Error screenshot saved to: ' + screenshotPath);
+                    console.log(JSON.stringify({ 
+                        success: false, 
+                        message: error.message 
+                    }));
+                } finally {
+                    console.log('Closing browser...');
+                    await browser.close();
+                }
             }
             
-            Log::error('Login failed - Balance button not found');
-            return false;
+            login().catch(error => {
+                console.error('Fatal error:', error);
+                process.exit(1);
+            });
+            JS;
+            
+            file_put_contents($scriptPath, $script);
+            
+            // Run the script
+            $process = new Process(['node', $scriptPath]);
+            $process->setTimeout(60); // Set timeout to 60 seconds
+            $process->run();
+            
+            // Get the output
+            $output = $process->getOutput();
+            Log::info('Script output: ' . $output);
+            
+            if (!$process->isSuccessful()) {
+                Log::error('Script failed: ' . $process->getErrorOutput());
+                throw new \Exception('Script failed: ' . $process->getErrorOutput());
+            }
+            
+            $result = json_decode($output, true);
+            
+            // Clean up
+            unlink($scriptPath);
+            
+            if ($result && $result['success']) {
+                Log::info($result['message']);
+                return [
+                    'success' => true,
+                    'message' => $result['message'],
+                    'balance' => $result['balance'] ?? null
+                ];
+            }
+            
+            Log::error('Login failed: ' . ($result['message'] ?? 'Unknown error'));
+            return [
+                'success' => false,
+                'message' => $result['message'] ?? 'Unknown error'
+            ];
 
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage());
-            return false;
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
         }
     }
 
@@ -164,17 +316,87 @@ class BetpawaPlaywright
     public function getBalance()
     {
         try {
-            $browser = new Browsershot();
-            $browser->setUrl('https://www.betpawa.co.tz/account');
+            // Create a temporary JavaScript file for getting balance
+            $scriptPath = storage_path('app/temp-balance.js');
+            $script = <<<JS
+            import { chromium } from 'playwright';
             
-            // Get balance
-            $balance = $browser->evaluate("
-                document.querySelector('.balance-amount').textContent
-            ");
+            async function getBalance() {
+                const browser = await chromium.launch({ 
+                    headless: false,
+                    slowMo: 100 // Add delay between actions
+                });
+                try {
+                    const context = await browser.newContext();
+                    const page = await context.newPage();
+                    
+                    // Navigate to Betpawa
+                    await page.goto('https://www.betpawa.co.tz');
+                    await page.waitForLoadState('networkidle');
+                    
+                    // Take screenshot of homepage
+                    await page.screenshot({ path: '{$this->screenshotPath}/1-homepage.png' });
+                    
+                    // Check if already logged in
+                    const isLoggedIn = await page.waitForSelector('.button.balance', { timeout: 5000 })
+                        .then(() => true)
+                        .catch(() => false);
+                    
+                    if (isLoggedIn) {
+                        const balance = await page.textContent('.button.balance');
+                        await page.screenshot({ path: '{$this->screenshotPath}/2-balance.png' });
+                        console.log(JSON.stringify({ 
+                            success: true, 
+                            balance 
+                        }));
+                    } else {
+                        await page.screenshot({ path: '{$this->screenshotPath}/2-not-logged-in.png' });
+                        console.log(JSON.stringify({ 
+                            success: false, 
+                            message: 'Not logged in' 
+                        }));
+                    }
+                    
+                    // Wait for 5 seconds before closing
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                } catch (error) {
+                    await page.screenshot({ path: '{$this->screenshotPath}/error.png' });
+                    console.log(JSON.stringify({ 
+                        success: false, 
+                        message: error.message 
+                    }));
+                } finally {
+                    await browser.close();
+                }
+            }
+            
+            getBalance();
+            JS;
+            
+            file_put_contents($scriptPath, $script);
+            
+            // Run the script
+            $process = new Process(['node', $scriptPath]);
+            $process->run();
+            
+            // Get the output
+            $output = $process->getOutput();
+            $result = json_decode($output, true);
+            
+            // Clean up
+            unlink($scriptPath);
+            
+            if ($result && $result['success']) {
+                return [
+                    'success' => true,
+                    'balance' => floatval(str_replace(['TZS', ','], '', $result['balance']))
+                ];
+            }
             
             return [
-                'success' => true,
-                'balance' => floatval(str_replace(['TZS', ','], '', $balance))
+                'success' => false,
+                'message' => $result['message'] ?? 'Failed to get balance'
             ];
 
         } catch (\Exception $e) {

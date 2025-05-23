@@ -1,14 +1,14 @@
- # ⚽ BetPawa Automation Bot
+# ⚽ BetPawa Automation Bot
 
-A professional betting automation system that integrates with **Adibet**, **BetPawa** and **OddsPortal** to provide automated betting capabilities.
+A professional betting automation system that integrates with **BetPawa**, **Adibet**, **OddsPortal** and **SportyTrader** to provide automated betting capabilities.
 
 ---
 
 ## 🔥 Features
 
 - 🔐 Secure BetPawa login via Puppeteer or Cookie Injection  
-- 📊 OddsPortal match scraping with intelligent filtering  
-- 📈 Real-time odds fetching via OddsPortal  
+- 📊 Multiple source scraping (Adibet, OddsPortal, SportyTrader) with intelligent filtering  
+- 📈 Real-time odds fetching and comparison  
 - 🤖 Automated bet placement with configurable rules  
 - 🧠 Intelligent match scoring and prioritization  
 - 📱 Modern web interface for monitoring and control  
@@ -48,6 +48,7 @@ Update `.env`:
 ```
 BETPAWA_PHONE=your_phone
 BETPAWA_PASSWORD=your_password
+ODDS_API_KEY=your_api_key
 ```
 
 4. **Run Migrations**
@@ -89,7 +90,10 @@ npm run dev
 ├── public/screenshots/     # Saved Screenshots
 ├── storage/logs/           # Log files
 ├── betpawa-bot.js
-└── betpawa-login.js
+├── betpawa-login.js
+├── adibet-scraper.js
+├── sportytrader-scraper.js
+└── test-bet.js
 ```
 
 ---
@@ -200,10 +204,8 @@ Options:
 ### 🕸️ Scraper Commands
 
 ```bash
-php artisan test:oddsportal
-php artisan test:oddsportal --date=2024-03-20
-php artisan test:oddsportal --clear-cache
-php artisan test:oddsportal --force
+php artisan scrape:adibet
+php artisan scrape:test --url=https://example.com --verbose
 ```
 
 ### 🧹 Maintenance
@@ -225,6 +227,7 @@ php artisan predictions:import-historical history.json --start-date=2024-01-01 -
 
 ```bash
 php artisan test:place-bet --amount=2000 --type=single
+php artisan test:odds-integration --platform=oddsapi
 php artisan test:betpawa-login --verbose
 ```
 

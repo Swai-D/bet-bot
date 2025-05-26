@@ -55,11 +55,18 @@ const selectedBets = computed(() => {
 
 // Methods
 const toggleBot = async () => {
+    if (!confirm(`Are you sure you want to ${botStatus.value ? 'stop' : 'start'} the bot?`)) {
+        return;
+    }
+
     try {
         const response = await axios.post('/api/automation/toggle');
         if (response.data.success) {
             botStatus.value = response.data.status;
-        console.log('Bot status toggled:', botStatus.value);
+            console.log('Bot status toggled:', botStatus.value);
+            
+            // Show success message
+            alert(`Bot ${botStatus.value ? 'started' : 'stopped'} successfully!`);
         } else {
             alert('Failed to toggle bot: ' + response.data.message);
         }
@@ -70,9 +77,14 @@ const toggleBot = async () => {
 };
 
 const runScraper = async () => {
+    if (!confirm('Are you sure you want to run the scraper now?')) {
+        return;
+    }
+
     try {
         const response = await axios.post('/dashboard/scraper/run');
         console.log('Scraper response:', response.data);
+        alert('Scraper started successfully!');
         // Refresh predictions after scraping
         window.location.reload();
     } catch (error) {
@@ -82,9 +94,21 @@ const runScraper = async () => {
 };
 
 const placeBets = async () => {
+    if (!selectedBets.value.length) {
+        alert('Please select at least one bet to place.');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to place ${selectedBets.value.length} bets?`)) {
+        return;
+    }
+
     try {
-        const response = await axios.post('/dashboard/bets/place');
+        const response = await axios.post('/dashboard/bets/place', {
+            matches: selectedBets.value
+        });
         console.log('Place bets response:', response.data);
+        alert('Bets placed successfully!');
         // Refresh predictions after placing bets
         window.location.reload();
     } catch (error) {
@@ -126,16 +150,30 @@ const updateSettings = async () => {
     try {
         const response = await axios.post('/dashboard/settings/update', settings.value);
         console.log('Settings update response:', response.data);
-        alert('Settings updated successfully!');
+        
+        // Show success message
+        const successMessage = document.createElement('div');
+        successMessage.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg';
+        successMessage.textContent = 'Settings updated successfully!';
+        document.body.appendChild(successMessage);
+        
+        // Remove message after 3 seconds
+        setTimeout(() => {
+            successMessage.remove();
+        }, 3000);
     } catch (error) {
         console.error('Failed to update settings:', error);
         alert('Failed to update settings. Please try again.');
     }
 };
 
-// Watch settings changes
+// Watch settings changes with debounce
+let settingsTimeout;
 watch(settings, () => {
-    updateSettings();
+    clearTimeout(settingsTimeout);
+    settingsTimeout = setTimeout(() => {
+        updateSettings();
+    }, 1000);
 }, { deep: true });
 
 // Add updatePredictions method
@@ -143,8 +181,13 @@ const updatePredictions = (newPredictions) => {
     predictions.value = newPredictions;
 };
 
-// Add status check on mount
+// Add status check on mount and every 30 seconds
 onMounted(async () => {
+    await checkBotStatus();
+    setInterval(checkBotStatus, 30000);
+});
+
+const checkBotStatus = async () => {
     try {
         const response = await axios.get('/api/automation/status');
         if (response.data.success) {
@@ -153,7 +196,7 @@ onMounted(async () => {
     } catch (error) {
         console.error('Failed to fetch bot status:', error);
     }
-});
+};
 </script>
 
 <template>
@@ -249,25 +292,37 @@ onMounted(async () => {
                 <!-- Betting Control Panel -->
                 <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                     <div class="p-6">
-                        <h3 class="text-xl font-semibold mb-4 text-white">Betting Control Panel</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold text-white">Quick Settings</h3>
+                            <a 
+                                href="/settings" 
+                                class="text-sm text-blue-400 hover:text-blue-300 flex items-center"
+                            >
+                                <span>Advanced Settings</span>
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </a>
+                        </div>
+                        
+                        <!-- Essential Settings -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label class="block text-sm font-medium text-gray-300">Minimum Odds</label>
-                                <input 
-                                    type="number" 
-                                    v-model="settings.minOdds"
-                                    step="0.01"
+                                <label class="block text-sm font-medium text-gray-300">Selection Mode</label>
+                                <select 
+                                    v-model="settings.selectionMode"
                                     class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                                 >
+                                    <option value="auto">Automatic</option>
+                                    <option value="manual">Manual</option>
+                                </select>
+                                <p class="mt-1 text-sm text-gray-400">
+                                    {{ settings.selectionMode === 'auto' 
+                                        ? 'Bot will automatically select matches based on criteria' 
+                                        : 'You will manually select matches for betting' }}
+                                </p>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300">Auto Select Matches</label>
-                                <input 
-                                    type="number" 
-                                    v-model="settings.autoSelectCount"
-                                    class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
-                                >
-                            </div>
+
                             <div>
                                 <label class="block text-sm font-medium text-gray-300">Bet Amount (TZS)</label>
                                 <input 
@@ -275,16 +330,6 @@ onMounted(async () => {
                                     v-model="settings.betAmount"
                                     class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
                                 >
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300">Selection Mode</label>
-                                <select 
-                                    v-model="settings.selectionMode"
-                                    class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
-                                >
-                                    <option value="auto">Auto</option>
-                                    <option value="manual">Manual</option>
-                                </select>
                             </div>
                         </div>
                     </div>

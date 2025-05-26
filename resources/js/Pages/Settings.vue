@@ -19,107 +19,71 @@
                 </div>
 
                 <form @submit.prevent="saveSettings" class="space-y-6">
-                    <!-- Automation Settings -->
-                <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                        <div class="p-6 text-gray-300">
-                            <h3 class="text-lg font-medium mb-4">Automation Settings</h3>
+                    <!-- Basic Settings -->
+                    <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium text-gray-300 mb-4">Basic Settings</h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300">Minimum Odds</label>
+                                    <input 
+                                        type="number" 
+                                        v-model="form.min_odds"
+                                        step="0.01"
+                                        class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                                    >
+                                </div>
 
-                            <!-- Auto Run Scraper -->
-                            <div class="mb-4">
-                                <label class="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        v-model="form.auto_run_scraper"
-                                        class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    />
-                                    <span class="ml-2">Auto Run Scraper</span>
-                                </label>
-                                <p class="mt-1 text-sm text-gray-400">Automatically run scraper at scheduled time</p>
-                            </div>
-
-                            <!-- Scraper Time -->
-                            <div v-if="form.auto_run_scraper" class="mb-4">
-                                <label for="scraper_time" class="block text-sm font-medium text-gray-300">Scraper Time</label>
-                                <input
-                                    type="time"
-                                    id="scraper_time"
-                                    v-model="form.scraper_time"
-                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                />
-                                <p class="mt-1 text-sm text-gray-400">Time to run scraper automatically</p>
-                            </div>
-
-                            <!-- Auto Place Bets -->
-                            <div class="mb-4">
-                                <label class="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        v-model="form.auto_place_bets"
-                                        class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    />
-                                    <span class="ml-2">Auto Place Bets</span>
-                                </label>
-                                <p class="mt-1 text-sm text-gray-400">Automatically place bets based on predictions</p>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-300">Auto Select Count</label>
+                                    <input 
+                                        type="number" 
+                                        v-model="form.auto_select_count"
+                                        class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                                    >
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Betting Strategy -->
+                    <!-- Automation Settings -->
                     <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                        <div class="p-6 text-gray-300">
-                            <h3 class="text-lg font-medium mb-4">Betting Strategy</h3>
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium text-gray-300 mb-4">Automation Settings</h3>
                             
-                            <!-- Confidence Threshold -->
-                            <div class="mb-4">
-                                <label for="confidence_threshold" class="block text-sm font-medium text-gray-300">Confidence Threshold</label>
-                                <select
-                                    id="confidence_threshold"
-                                    v-model="form.confidence_threshold"
-                                    class="mt-1 block w-full rounded-md border-gray-600 bg-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                >
-                                    <option value="high">High</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="low">Low</option>
-                                </select>
-                                <p class="mt-1 text-sm text-gray-400">Minimum confidence level for predictions</p>
-                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            v-model="form.auto_run_scraper"
+                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        >
+                                        <span class="ml-2 text-gray-300">Auto Run Scraper</span>
+                                    </label>
+                                    <p class="mt-1 text-sm text-gray-400">Automatically run scraper at scheduled time</p>
+                                </div>
 
-                            <!-- Bet Types -->
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-300 mb-2">Bet Types</label>
-                                <div class="space-y-2">
+                                <div v-if="form.auto_run_scraper">
+                                    <label class="block text-sm font-medium text-gray-300">Scraper Time</label>
+                                    <input 
+                                        type="time" 
+                                        v-model="form.scraper_time"
+                                        class="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
+                                    >
+                                </div>
+
+                                <div>
                                     <label class="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            v-model="form.bet_types.homeWin"
+                                        <input 
+                                            type="checkbox" 
+                                            v-model="form.auto_place_bets"
                                             class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2">Home Win</span>
+                                        >
+                                        <span class="ml-2 text-gray-300">Auto Place Bets</span>
                                     </label>
-                                    <label class="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            v-model="form.bet_types.draw"
-                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2">Draw</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            v-model="form.bet_types.awayWin"
-                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2">Away Win</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            v-model="form.bet_types.over2_5"
-                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                        />
-                                        <span class="ml-2">Over 2.5 Goals</span>
-                                    </label>
+                                    <p class="mt-1 text-sm text-gray-400">Automatically place bets for selected matches</p>
                                 </div>
                             </div>
                         </div>
@@ -127,39 +91,36 @@
 
                     <!-- Notification Settings -->
                     <div class="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                        <div class="p-6 text-gray-300">
-                            <h3 class="text-lg font-medium mb-4">Notification Settings</h3>
-
-                            <!-- Enable Notifications -->
-                            <div class="mb-4">
-                                <label class="flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        v-model="form.enable_notifications"
-                                        class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    />
-                                    <span class="ml-2">Enable Notifications</span>
-                                </label>
-                                <p class="mt-1 text-sm text-gray-400">Receive notifications for important events</p>
+                        <div class="p-6">
+                            <h3 class="text-lg font-medium text-gray-300 mb-4">Notification Settings</h3>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            v-model="form.enable_notifications"
+                                            class="rounded border-gray-600 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        >
+                                        <span class="ml-2 text-gray-300">Enable Notifications</span>
+                                    </label>
+                                    <p class="mt-1 text-sm text-gray-400">Receive notifications for important events</p>
+                                </div>
                             </div>
                         </div>
-                            </div>
+                    </div>
 
                     <!-- Save Button -->
-                            <div class="flex justify-end">
-                                <button
-                                    type="submit"
-                                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                                    :disabled="form.processing"
-                                >
-                                    <svg v-if="form.processing" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    {{ form.processing ? 'Saving...' : 'Save Settings' }}
-                                </button>
-                            </div>
-                        </form>
+                    <div class="flex justify-end">
+                        <button 
+                            type="submit"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors duration-200"
+                            :disabled="isSaving"
+                        >
+                            {{ isSaving ? 'Saving...' : 'Save Settings' }}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </AuthenticatedLayout>

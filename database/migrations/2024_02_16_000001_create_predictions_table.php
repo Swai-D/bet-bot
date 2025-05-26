@@ -14,7 +14,8 @@ return new class extends Migration
             $table->string('match');
             $table->string('country');
             $table->string('league')->default('Unknown League');
-            $table->dateTime('date');
+            $table->date('match_date');
+            $table->time('match_time');
             $table->float('score')->default(0);
             $table->json('tips')->nullable();
             $table->json('raw_data')->nullable();

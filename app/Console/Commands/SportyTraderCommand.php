@@ -5,22 +5,24 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use App\Services\SportyTraderScraper;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 
-class TestSportyTraderCommand extends Command
+class SportyTraderCommand extends Command
 {
-    protected $signature = 'prediction:test-sportytrader
+    protected $signature = 'prediction:sportytrader
                             {--save : Save predictions to database}
                             {--odds : Fetch odds for predictions}
                             {--detailed : Show detailed view}';
 
-    protected $description = 'Test SportyTrader scraper and optionally save predictions';
+    protected $description = 'Fetch predictions from SportyTrader and optionally save them';
 
     public function handle()
     {
         $this->showHeader();
 
         try {
-            $this->info('🚀 Starting SportyTrader scraper test...');
+            $this->info('🚀 Starting SportyTrader scraper...');
             
             $scraper = new SportyTraderScraper();
             $result = $scraper->getPredictionsWithOdds();
@@ -61,7 +63,7 @@ class TestSportyTraderCommand extends Command
     {
         $this->newLine();
         $this->info('╔════════════════════════════════════════════════════════════╗');
-        $this->info('║                SPORTYTRADER SCRAPER TEST                    ║');
+        $this->info('║                SPORTYTRADER PREDICTIONS                     ║');
         $this->info('╚════════════════════════════════════════════════════════════╝');
         $this->newLine();
     }
@@ -126,13 +128,11 @@ class TestSportyTraderCommand extends Command
 
         foreach ($predictions as $prediction) {
             try {
-                $response = app()->make('App\Http\Controllers\PredictionController')
-                    ->store(new \Illuminate\Http\Request($prediction));
-                
-                if ($response->getStatusCode() === 200) {
+                if ($this->processPrediction($prediction)) {
                     $saved++;
                 } else {
                     $skipped++;
+                    Log::warning('Skipped prediction: ' . json_encode($prediction));
                 }
             } catch (\Exception $e) {
                 $errors++;
@@ -141,5 +141,48 @@ class TestSportyTraderCommand extends Command
         }
 
         $this->info("✅ Saved: {$saved}, Skipped: {$skipped}, Errors: {$errors}");
+    }
+
+    protected function processPrediction($prediction)
+    {
+        try {
+            // Format tips array
+            $tips = [];
+            foreach ($prediction['tips'] as $tip) {
+                $tips[] = [
+                    'prediction' => $tip['prediction'],
+                    'odds' => (float) $tip['odds']
+                ];
+            }
+
+            // Prepare prediction data
+            $predictionData = [
+                'match' => $prediction['match'],
+                'country' => $prediction['country'],
+                'league' => $prediction['league'],
+                'date' => $prediction['date'],
+                'time' => $prediction['time'],
+                'tips' => $tips,
+                'source' => 'sportytrader',
+                'raw_data' => $prediction
+            ];
+
+            // Store prediction using controller directly
+            $response = app()->make('App\Http\Controllers\PredictionController')
+                ->store(new \Illuminate\Http\Request($predictionData));
+
+            if ($response->getStatusCode() === 200) {
+                $this->info("Successfully stored prediction for: {$prediction['match']}");
+                return true;
+            } else {
+                $this->error("Failed to store prediction for: {$prediction['match']}");
+                $this->error("Error: " . $response->getContent());
+                return false;
+            }
+
+        } catch (\Exception $e) {
+            $this->error("Error processing prediction: " . $e->getMessage());
+            return false;
+        }
     }
 } 

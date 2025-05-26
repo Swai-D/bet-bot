@@ -93,14 +93,14 @@ class PredictionController extends Controller
                 'country' => 'required|string',
                 'league' => 'nullable|string',
                 'date' => 'required|date',
+                'time' => 'required|string',
                 'tips' => 'required|array',
-                'odds' => 'nullable|array',
-                'raw_data' => 'nullable|array',
-                'source' => 'required|in:adibet,sportytrader'
+                'source' => 'required|in:adibet,sportytrader',
+                'raw_data' => 'nullable|array'
             ]);
 
             // Generate unique match_id
-            $matchId = md5($data['match'] . $data['date']);
+            $matchId = md5($data['match'] . $data['date'] . $data['time']);
 
             // Check if prediction already exists
             $existingPrediction = Prediction::where('match_id', $matchId)->first();
@@ -111,15 +111,17 @@ class PredictionController extends Controller
                     'match' => $data['match'],
                     'country' => $data['country'],
                     'league' => $data['league'] ?? 'Unknown League',
-                    'date' => $data['date'],
+                    'match_date' => $data['date'],
+                    'match_time' => $data['time'],
                     'tips' => $data['tips'],
-                    'raw_data' => $data['raw_data'] ?? null
+                    'raw_data' => $data['raw_data'] ?? null,
+                    'source' => $data['source']
                 ]);
 
                 return response()->json([
                     'message' => 'Prediction updated successfully',
                     'prediction' => $existingPrediction
-                ]);
+                ], 200);
             }
 
             // Create new prediction
@@ -128,15 +130,17 @@ class PredictionController extends Controller
                 'match' => $data['match'],
                 'country' => $data['country'],
                 'league' => $data['league'] ?? 'Unknown League',
-                'date' => $data['date'],
+                'match_date' => $data['date'],
+                'match_time' => $data['time'],
                 'tips' => $data['tips'],
-                'raw_data' => $data['raw_data'] ?? null
+                'raw_data' => $data['raw_data'] ?? null,
+                'source' => $data['source']
             ]);
 
             return response()->json([
                 'message' => 'Prediction created successfully',
                 'prediction' => $prediction
-            ]);
+            ], 200);
 
         } catch (\Exception $e) {
             Log::error('Error storing prediction: ' . $e->getMessage());

@@ -12,14 +12,16 @@ class Prediction extends Model
         'match',
         'country',
         'league',
-        'date',
+        'match_date',
+        'match_time',
         'score',
         'tips',
         'raw_data'
     ];
 
     protected $casts = [
-        'date' => 'datetime',
+        'match_date' => 'date',
+        'match_time' => 'datetime',
         'raw_data' => 'json',
         'tips' => 'json',
         'score' => 'float'
@@ -38,7 +40,7 @@ class Prediction extends Model
      */
     public function scopeForDate($query, $date)
     {
-        return $query->whereDate('date', $date);
+        return $query->whereDate('match_date', $date);
     }
 
     /**
@@ -57,11 +59,17 @@ class Prediction extends Model
         return $this->match;
     }
 
-    public function getFormattedDateAttribute()
+    /**
+     * Get the formatted date and time.
+     */
+    public function getFormattedDateTimeAttribute()
     {
-        return $this->date->format('Y-m-d H:i:s');
+        return $this->match_date->format('Y-m-d') . ' ' . $this->match_time->format('H:i');
     }
 
+    /**
+     * Get the league tier based on score.
+     */
     public function getLeagueTierAttribute()
     {
         if ($this->score >= 4) {
